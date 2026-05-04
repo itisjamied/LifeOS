@@ -1,0 +1,266 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 6px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  /* Routine palette — muted, all derive from neutrals + violet primary.
+     Each task keeps a subtle hue for legend / grid, but the UI leans on
+     a single pop color (--primary) for energy. */
+  --color-routine-oral: var(--routine-oral);
+  --color-routine-skin-am: var(--routine-skin-am);
+  --color-routine-makeup: var(--routine-makeup);
+  --color-routine-haircare: var(--routine-haircare);
+  --color-routine-shower: var(--routine-shower);
+  --color-routine-shave: var(--routine-shave);
+  --color-routine-after: var(--routine-after);
+  --color-routine-oral-pm: var(--routine-oral-pm);
+  --color-routine-floss: var(--routine-floss);
+  --color-routine-skin-pm: var(--routine-skin-pm);
+  --color-routine-nails: var(--routine-nails);
+
+  --font-display: "Inter", system-ui, sans-serif;
+  --font-sans: "Inter", system-ui, sans-serif;
+
+  --animate-pop: pop 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
+  --animate-fade-up: fade-up 0.35s ease-out;
+  --animate-check: check 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
+  --animate-wiggle: wiggle 0.4s ease-in-out;
+}
+
+:root {
+  --radius: 1rem;
+
+  /* Light — bright, airy, off-white */
+  --background: oklch(0.985 0.003 270);
+  --foreground: oklch(0.18 0.02 270);
+
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.18 0.02 270);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.18 0.02 270);
+
+  /* THE pop — soft violet */
+  --primary: oklch(0.62 0.18 295);
+  --primary-foreground: oklch(0.99 0.005 270);
+
+  --secondary: oklch(0.96 0.005 270);
+  --secondary-foreground: oklch(0.22 0.02 270);
+
+  --muted: oklch(0.96 0.005 270);
+  --muted-foreground: oklch(0.5 0.015 270);
+
+  --accent: oklch(0.94 0.04 295);
+  --accent-foreground: oklch(0.32 0.12 295);
+
+  --destructive: oklch(0.6 0.2 25);
+  --destructive-foreground: oklch(0.99 0.005 270);
+
+  --border: oklch(0.92 0.005 270);
+  --input: oklch(0.94 0.005 270);
+  --ring: oklch(0.62 0.18 295);
+
+  /* Subtle category hues — desaturated so violet stays the star */
+  --routine-oral: oklch(0.65 0.08 240);
+  --routine-skin-am: oklch(0.62 0.07 160);
+  --routine-makeup: oklch(0.7 0.08 10);
+  --routine-haircare: oklch(0.6 0.1 30);
+  --routine-shower: oklch(0.6 0.08 230);
+  --routine-shave: oklch(0.55 0.04 60);
+  --routine-after: oklch(0.55 0.08 250);
+  --routine-oral-pm: oklch(0.58 0.08 230);
+  --routine-floss: oklch(0.55 0.08 250);
+  --routine-skin-pm: oklch(0.62 0.1 145);
+  --routine-nails: oklch(0.7 0.1 75);
+}
+
+.dark {
+  /* Dark — near-black, Linear/Arc vibe */
+  --background: oklch(0.16 0.012 270);
+  --foreground: oklch(0.96 0.005 270);
+
+  --card: oklch(0.21 0.014 270);
+  --card-foreground: oklch(0.96 0.005 270);
+  --popover: oklch(0.21 0.014 270);
+  --popover-foreground: oklch(0.96 0.005 270);
+
+  --primary: oklch(0.72 0.16 295);
+  --primary-foreground: oklch(0.16 0.012 270);
+
+  --secondary: oklch(0.26 0.015 270);
+  --secondary-foreground: oklch(0.96 0.005 270);
+
+  --muted: oklch(0.24 0.013 270);
+  --muted-foreground: oklch(0.68 0.012 270);
+
+  --accent: oklch(0.32 0.08 295);
+  --accent-foreground: oklch(0.92 0.04 295);
+
+  --destructive: oklch(0.65 0.2 25);
+  --destructive-foreground: oklch(0.99 0.005 270);
+
+  --border: oklch(1 0 0 / 8%);
+  --input: oklch(1 0 0 / 12%);
+  --ring: oklch(0.72 0.16 295);
+
+  --routine-oral: oklch(0.72 0.1 240);
+  --routine-skin-am: oklch(0.7 0.09 160);
+  --routine-makeup: oklch(0.78 0.09 10);
+  --routine-haircare: oklch(0.7 0.12 30);
+  --routine-shower: oklch(0.7 0.1 230);
+  --routine-shave: oklch(0.7 0.04 60);
+  --routine-after: oklch(0.68 0.1 250);
+  --routine-oral-pm: oklch(0.7 0.09 230);
+  --routine-floss: oklch(0.68 0.1 250);
+  --routine-skin-pm: oklch(0.72 0.12 145);
+  --routine-nails: oklch(0.78 0.11 75);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+  html,
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+  }
+  body {
+    font-family: var(--font-sans);
+    font-feature-settings: "ss01", "cv11";
+    -webkit-tap-highlight-color: transparent;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+    letter-spacing: -0.025em;
+    font-weight: 700;
+  }
+  h1 {
+    letter-spacing: -0.035em;
+  }
+}
+
+@layer components {
+  .surface {
+    background-color: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    transition:
+      border-color 0.2s ease,
+      transform 0.2s ease,
+      box-shadow 0.2s ease;
+  }
+  .surface-interactive:active {
+    transform: scale(0.985);
+  }
+
+  .pop-dot {
+    position: relative;
+  }
+  .pop-dot::after {
+    content: "";
+    position: absolute;
+    inset: -4px;
+    border-radius: 9999px;
+    background: var(--primary);
+    opacity: 0.18;
+    filter: blur(6px);
+    z-index: -1;
+  }
+}
+
+@keyframes pop {
+  0% {
+    transform: scale(0.8);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.08);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes check {
+  0% {
+    transform: scale(0.6) rotate(-12deg);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1) rotate(0);
+    opacity: 1;
+  }
+}
+@keyframes wiggle {
+  0%,
+  100% {
+    transform: rotate(0);
+  }
+  25% {
+    transform: rotate(-6deg);
+  }
+  75% {
+    transform: rotate(6deg);
+  }
+}
+
+.animate-pop {
+  animation: var(--animate-pop);
+}
+.animate-fade-up {
+  animation: var(--animate-fade-up);
+}
+.animate-check {
+  animation: var(--animate-check);
+}
+.animate-wiggle {
+  animation: var(--animate-wiggle);
+}
+
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("https://fonts.gstatic.com/s/inter/v18/UcCO3FwrK3iLTeHuS_nVMrMxCp50SjIa1ZL7.woff2")
+    format("woff2");
+}
