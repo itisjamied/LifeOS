@@ -58,9 +58,7 @@ function SettingsPage() {
     <div className="px-5 pt-10 animate-fade-up">
       <header className="mb-7 flex items-start justify-between">
         <div>
-          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-            Account
-          </p>
+          <p className="text-xs font-medium uppercase text-muted-foreground">Account</p>
           <h1 className="mt-1 text-4xl text-foreground">Settings</h1>
         </div>
         <ThemeToggle />

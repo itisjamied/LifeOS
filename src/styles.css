@@ -29,9 +29,7 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
 
-  /* Routine palette — muted, all derive from neutrals + violet primary.
-     Each task keeps a subtle hue for legend / grid, but the UI leans on
-     a single pop color (--primary) for energy. */
+  /* Routine palette — bright habit-app color bands. */
   --color-routine-oral: var(--routine-oral);
   --color-routine-skin-am: var(--routine-skin-am);
   --color-routine-makeup: var(--routine-makeup);
@@ -54,91 +52,89 @@
 }
 
 :root {
-  --radius: 1rem;
+  --radius: 1.35rem;
 
-  /* Light — bright, airy, off-white */
-  --background: oklch(0.985 0.003 270);
-  --foreground: oklch(0.18 0.02 270);
+  /* Light — cool, glassy, app-store screenshot energy */
+  --background: oklch(0.965 0.018 245);
+  --foreground: oklch(0.25 0.045 265);
 
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.18 0.02 270);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.18 0.02 270);
+  --card: oklch(0.995 0.004 240 / 86%);
+  --card-foreground: oklch(0.25 0.045 265);
+  --popover: oklch(0.995 0.004 240);
+  --popover-foreground: oklch(0.25 0.045 265);
 
-  /* THE pop — soft violet */
-  --primary: oklch(0.62 0.18 295);
-  --primary-foreground: oklch(0.99 0.005 270);
+  --primary: oklch(0.7 0.13 235);
+  --primary-foreground: oklch(0.99 0.004 240);
 
-  --secondary: oklch(0.96 0.005 270);
-  --secondary-foreground: oklch(0.22 0.02 270);
+  --secondary: oklch(0.92 0.025 245);
+  --secondary-foreground: oklch(0.28 0.05 265);
 
-  --muted: oklch(0.96 0.005 270);
-  --muted-foreground: oklch(0.5 0.015 270);
+  --muted: oklch(0.925 0.02 250);
+  --muted-foreground: oklch(0.55 0.03 265);
 
-  --accent: oklch(0.94 0.04 295);
-  --accent-foreground: oklch(0.32 0.12 295);
+  --accent: oklch(0.89 0.06 205);
+  --accent-foreground: oklch(0.32 0.07 250);
 
-  --destructive: oklch(0.6 0.2 25);
-  --destructive-foreground: oklch(0.99 0.005 270);
+  --destructive: oklch(0.65 0.18 20);
+  --destructive-foreground: oklch(0.99 0.004 240);
 
-  --border: oklch(0.92 0.005 270);
-  --input: oklch(0.94 0.005 270);
-  --ring: oklch(0.62 0.18 295);
+  --border: oklch(0.86 0.022 250 / 58%);
+  --input: oklch(0.91 0.018 250);
+  --ring: oklch(0.68 0.12 235);
 
-  /* Subtle category hues — desaturated so violet stays the star */
-  --routine-oral: oklch(0.65 0.08 240);
-  --routine-skin-am: oklch(0.62 0.07 160);
-  --routine-makeup: oklch(0.7 0.08 10);
-  --routine-haircare: oklch(0.6 0.1 30);
-  --routine-shower: oklch(0.6 0.08 230);
-  --routine-shave: oklch(0.55 0.04 60);
-  --routine-after: oklch(0.55 0.08 250);
-  --routine-oral-pm: oklch(0.58 0.08 230);
-  --routine-floss: oklch(0.55 0.08 250);
-  --routine-skin-pm: oklch(0.62 0.1 145);
-  --routine-nails: oklch(0.7 0.1 75);
+  --routine-oral: oklch(0.72 0.14 170);
+  --routine-skin-am: oklch(0.72 0.12 205);
+  --routine-makeup: oklch(0.74 0.15 330);
+  --routine-haircare: oklch(0.75 0.15 300);
+  --routine-shower: oklch(0.7 0.14 235);
+  --routine-shave: oklch(0.76 0.13 75);
+  --routine-after: oklch(0.65 0.13 255);
+  --routine-oral-pm: oklch(0.68 0.12 250);
+  --routine-floss: oklch(0.72 0.14 285);
+  --routine-skin-pm: oklch(0.75 0.15 145);
+  --routine-nails: oklch(0.78 0.16 55);
 }
 
 .dark {
-  /* Dark — near-black, Linear/Arc vibe */
-  --background: oklch(0.16 0.012 270);
-  --foreground: oklch(0.96 0.005 270);
+  /* Dark — deep navy with saturated routine strips */
+  --background: oklch(0.24 0.055 265);
+  --foreground: oklch(0.95 0.012 245);
 
-  --card: oklch(0.21 0.014 270);
-  --card-foreground: oklch(0.96 0.005 270);
-  --popover: oklch(0.21 0.014 270);
-  --popover-foreground: oklch(0.96 0.005 270);
+  --card: oklch(0.3 0.055 260 / 86%);
+  --card-foreground: oklch(0.95 0.012 245);
+  --popover: oklch(0.3 0.055 260);
+  --popover-foreground: oklch(0.95 0.012 245);
 
-  --primary: oklch(0.72 0.16 295);
-  --primary-foreground: oklch(0.16 0.012 270);
+  --primary: oklch(0.76 0.13 220);
+  --primary-foreground: oklch(0.2 0.05 265);
 
-  --secondary: oklch(0.26 0.015 270);
-  --secondary-foreground: oklch(0.96 0.005 270);
+  --secondary: oklch(0.34 0.052 260);
+  --secondary-foreground: oklch(0.95 0.012 245);
 
-  --muted: oklch(0.24 0.013 270);
-  --muted-foreground: oklch(0.68 0.012 270);
+  --muted: oklch(0.34 0.048 260);
+  --muted-foreground: oklch(0.7 0.035 245);
 
-  --accent: oklch(0.32 0.08 295);
-  --accent-foreground: oklch(0.92 0.04 295);
+  --accent: oklch(0.42 0.07 230);
+  --accent-foreground: oklch(0.9 0.045 220);
 
-  --destructive: oklch(0.65 0.2 25);
-  --destructive-foreground: oklch(0.99 0.005 270);
+  --destructive: oklch(0.7 0.18 20);
+  --destructive-foreground: oklch(0.99 0.004 240);
 
-  --border: oklch(1 0 0 / 8%);
+  --border: oklch(1 0 0 / 9%);
   --input: oklch(1 0 0 / 12%);
-  --ring: oklch(0.72 0.16 295);
+  --ring: oklch(0.76 0.13 220);
 
-  --routine-oral: oklch(0.72 0.1 240);
-  --routine-skin-am: oklch(0.7 0.09 160);
-  --routine-makeup: oklch(0.78 0.09 10);
-  --routine-haircare: oklch(0.7 0.12 30);
-  --routine-shower: oklch(0.7 0.1 230);
-  --routine-shave: oklch(0.7 0.04 60);
-  --routine-after: oklch(0.68 0.1 250);
-  --routine-oral-pm: oklch(0.7 0.09 230);
-  --routine-floss: oklch(0.68 0.1 250);
-  --routine-skin-pm: oklch(0.72 0.12 145);
-  --routine-nails: oklch(0.78 0.11 75);
+  --routine-oral: oklch(0.74 0.14 170);
+  --routine-skin-am: oklch(0.74 0.12 205);
+  --routine-makeup: oklch(0.76 0.15 330);
+  --routine-haircare: oklch(0.77 0.15 300);
+  --routine-shower: oklch(0.72 0.14 235);
+  --routine-shave: oklch(0.78 0.13 75);
+  --routine-after: oklch(0.72 0.13 255);
+  --routine-oral-pm: oklch(0.72 0.12 250);
+  --routine-floss: oklch(0.76 0.14 285);
+  --routine-skin-pm: oklch(0.78 0.15 145);
+  --routine-nails: oklch(0.8 0.16 55);
 }
 
 @layer base {
@@ -150,21 +146,25 @@
     background-color: var(--color-background);
     color: var(--color-foreground);
   }
+  html {
+    min-height: 100%;
+  }
   body {
     font-family: var(--font-sans);
     font-feature-settings: "ss01", "cv11";
     -webkit-tap-highlight-color: transparent;
     -webkit-font-smoothing: antialiased;
+    min-height: 100%;
   }
   h1,
   h2,
   h3 {
     font-family: var(--font-display);
-    letter-spacing: -0.025em;
+    letter-spacing: 0;
     font-weight: 700;
   }
   h1 {
-    letter-spacing: -0.035em;
+    letter-spacing: 0;
   }
 }
 
@@ -173,6 +173,10 @@
     background-color: var(--card);
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
+    box-shadow:
+      0 18px 45px oklch(0.22 0.04 260 / 9%),
+      inset 0 1px 0 oklch(1 0 0 / 55%);
+    backdrop-filter: blur(18px);
     transition:
       border-color 0.2s ease,
       transform 0.2s ease,
@@ -180,6 +184,39 @@
   }
   .surface-interactive:active {
     transform: scale(0.985);
+  }
+
+  .icon-button {
+    display: inline-flex;
+    height: 2.5rem;
+    width: 2.5rem;
+    align-items: center;
+    justify-content: center;
+    border-radius: 9999px;
+    border: 1px solid var(--border);
+    background-color: var(--card);
+    color: var(--muted-foreground);
+    box-shadow: 0 10px 28px oklch(0.22 0.04 260 / 8%);
+    transition:
+      color 0.2s ease,
+      transform 0.2s ease,
+      background-color 0.2s ease;
+  }
+
+  .icon-button:hover {
+    color: var(--foreground);
+    transform: translateY(-1px);
+  }
+
+  .habit-pill {
+    border-radius: 1.55rem;
+    box-shadow: 0 16px 34px oklch(0.22 0.04 260 / 12%);
+  }
+
+  .dark .surface {
+    box-shadow:
+      0 18px 45px oklch(0.05 0.02 260 / 24%),
+      inset 0 1px 0 oklch(1 0 0 / 7%);
   }
 
   .pop-dot {

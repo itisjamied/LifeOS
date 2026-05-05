@@ -4,9 +4,9 @@ import { useAuth } from "@/lib/auth-context";
 import { fetchAllRoutine, fetchProfile, type FullTask } from "@/lib/routine-data";
 import { computeStats, type TaskStats } from "@/lib/streaks";
 import { parseISO } from "date-fns";
-import { Flame, Sparkles, Trophy, ArrowUpDown } from "lucide-react";
+import { Flame, Sparkles, Trophy, ArrowUpDown, UserRound } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { colorValue } from "@/lib/symbols";
+import { colorValue, glyphFor } from "@/lib/symbols";
 
 export const Route = createFileRoute("/stats")({
   head: () => ({
@@ -50,6 +50,12 @@ function StatsPage() {
     return m;
   }, [routine]);
 
+  const glyphOf = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const ft of routine) m.set(ft.task.id, glyphFor(ft.variants[0]?.symbol));
+    return m;
+  }, [routine]);
+
   const visible = useMemo(() => {
     if (!stats) return null;
     let list = stats;
@@ -83,25 +89,27 @@ function StatsPage() {
   const topStreak = [...stats].sort((a, b) => b.currentStreak - a.currentStreak)[0];
 
   return (
-    <div className="px-5 pt-10 pb-6 animate-fade-up">
-      <header className="mb-7 flex items-start justify-between">
-        <div>
-          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-            Last 90 days
-          </p>
-          <h1 className="mt-1 text-4xl text-foreground">Stats</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Streaks &amp; consistency per habit.</p>
+    <div className="px-5 pt-8 pb-6 animate-fade-up">
+      <header className="mb-6">
+        <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3">
+          <Link to="/settings" className="icon-button" aria-label="Settings" title="Settings">
+            <UserRound className="h-[18px] w-[18px]" />
+          </Link>
+          <div className="text-center">
+            <p className="text-[11px] font-semibold uppercase text-muted-foreground">90 days</p>
+            <h1 className="mt-1 text-3xl text-foreground">Stats</h1>
+          </div>
+          <ThemeToggle />
         </div>
-        <ThemeToggle />
       </header>
 
       {topStreak && topStreak.currentStreak > 0 && (
         <div className="surface mb-5 flex items-center gap-3 p-4">
-          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/15 text-primary">
+          <span className="flex h-12 w-12 items-center justify-center rounded-[1.1rem] bg-primary/15 text-primary">
             <Flame className="h-6 w-6" />
           </span>
           <div className="min-w-0 flex-1">
-            <p className="text-xs uppercase tracking-wider text-muted-foreground">Hottest streak</p>
+            <p className="text-xs font-bold uppercase text-muted-foreground">Top streak</p>
             <p className="truncate text-base font-semibold text-foreground">{topStreak.name}</p>
           </div>
           <p className="text-2xl font-bold text-primary">{topStreak.currentStreak}d</p>
@@ -110,7 +118,7 @@ function StatsPage() {
 
       {/* Filter & sort controls */}
       <div className="mb-4 space-y-2">
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 justify-center my-10">
           {(["all", "am", "pm", "any", "other"] as TimeFilter[]).map((tf) => (
             <button
               key={tf}
@@ -127,7 +135,7 @@ function StatsPage() {
         </div>
         <div className="flex items-center gap-1.5">
           <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground" />
-          <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Sort</span>
+          <span className="text-[10px] uppercase text-muted-foreground">Sort</span>
           {(
             [
               { k: "streak", label: "Streak" },
@@ -157,18 +165,23 @@ function StatsPage() {
             <Link
               to="/habit/$taskId"
               params={{ taskId: s.taskId }}
-              className="surface block p-4 transition-transform hover:-translate-y-0.5 hover:shadow-md"
+              className="habit-pill block overflow-hidden bg-card/85 p-4 shadow-sm transition-transform hover:-translate-y-0.5 hover:shadow-md"
             >
               <div className="flex items-center gap-3">
                 <span
-                  className="h-3 w-3 shrink-0 rounded-full"
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[1rem] text-base font-black text-white"
                   style={{ backgroundColor: colorValue(s.color) }}
                   aria-hidden
-                />
+                >
+                  {glyphOf.get(s.taskId) ?? "•"}
+                </span>
                 <span className="min-w-0 flex-1 truncate text-base font-semibold text-foreground">
                   {s.name}
                 </span>
-                <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-bold text-primary">
+                <span
+                  className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold text-white"
+                  style={{ backgroundColor: colorValue(s.color) }}
+                >
                   <Flame className="h-3 w-3" />
                   {s.currentStreak}d
                 </span>
@@ -184,11 +197,14 @@ function StatsPage() {
               </div>
               <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
                 <div
-                  className="h-full rounded-full bg-primary transition-all"
-                  style={{ width: `${s.consistencyPct}%` }}
+                  className="h-full rounded-full transition-all"
+                  style={{
+                    width: `${s.consistencyPct}%`,
+                    backgroundColor: colorValue(s.color),
+                  }}
                 />
               </div>
-              <p className="mt-1.5 text-[11px] text-muted-foreground">
+              <p className="mt-1.5 text-[11px] font-medium text-muted-foreground">
                 {s.completedCount} / {s.scheduledCount} scheduled days completed
               </p>
             </Link>
@@ -207,7 +223,7 @@ function StatsPage() {
 function Stat({ label, value, icon }: { label: string; value: string; icon?: React.ReactNode }) {
   return (
     <div className="rounded-lg bg-muted/50 px-2 py-1.5">
-      <p className="flex items-center justify-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground">
+      <p className="flex items-center justify-center gap-1 text-[10px] uppercase text-muted-foreground">
         {icon}
         {label}
       </p>
