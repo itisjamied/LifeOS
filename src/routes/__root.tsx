@@ -6,6 +6,7 @@ import {
   Scripts,
   useRouterState,
 } from "@tanstack/react-router";
+import { useEffect } from "react";
 import appCss from "../styles.css?url";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { Toaster } from "@/components/ui/sonner";
@@ -40,6 +41,12 @@ export const Route = createRootRoute({
           "Mobile-first 28-day maintenance routine tracker. Wake up, see what's due, check it off.",
       },
       { name: "theme-color", content: "#eff6fb" },
+      { name: "theme-color", content: "#26365f", media: "(prefers-color-scheme: dark)" },
+      { name: "color-scheme", content: "light dark" },
+      { name: "mobile-web-app-capable", content: "yes" },
+      { name: "apple-mobile-web-app-capable", content: "yes" },
+      { name: "apple-mobile-web-app-title", content: "Cycle" },
+      { name: "apple-mobile-web-app-status-bar-style", content: "default" },
       { property: "og:title", content: "Cycle — your 28-day routine" },
       { name: "twitter:title", content: "Cycle — your 28-day routine" },
       {
@@ -55,7 +62,12 @@ export const Route = createRootRoute({
       { name: "twitter:card", content: "summary_large_image" },
       { property: "og:type", content: "website" },
     ],
-    links: [{ rel: "stylesheet", href: appCss }],
+    links: [
+      { rel: "stylesheet", href: appCss },
+      { rel: "manifest", href: "/manifest.webmanifest" },
+      { rel: "icon", type: "image/svg+xml", href: "/app-icon.svg" },
+      { rel: "apple-touch-icon", href: "/apple-touch-icon.png" },
+    ],
   }),
   shellComponent: RootShell,
   component: RootComponent,
@@ -77,6 +89,20 @@ function RootShell({ children }: { children: React.ReactNode }) {
       </body>
     </html>
   );
+}
+
+function PwaBootstrap() {
+  useEffect(() => {
+    if (!("serviceWorker" in navigator)) return;
+    const isLocalhost = ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
+    if (window.location.protocol !== "https:" && !isLocalhost) return;
+
+    navigator.serviceWorker.register("/sw.js").catch(() => {
+      // Installability should fail quietly rather than interrupting the habit flow.
+    });
+  }, []);
+
+  return null;
 }
 
 function BottomNav() {
@@ -123,7 +149,11 @@ function BottomNav() {
 function RootComponent() {
   return (
     <>
-      <main className="mx-auto min-h-screen max-w-md lg:max-w-6xl pb-20">
+      <PwaBootstrap />
+      <main
+        className="mx-auto min-h-screen max-w-md lg:max-w-6xl"
+        style={{ paddingBottom: "calc(6rem + env(safe-area-inset-bottom))" }}
+      >
         <Outlet />
       </main>
       <BottomNav />

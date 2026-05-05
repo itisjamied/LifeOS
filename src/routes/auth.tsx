@@ -12,7 +12,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 export const Route = createFileRoute("/auth")({
   head: () => ({
     meta: [
-      { title: "Sign in — Cycle" },
+      { title: "LifeOS" },
       { name: "description", content: "Sign in to track your 28-day routine across devices." },
     ],
   }),
