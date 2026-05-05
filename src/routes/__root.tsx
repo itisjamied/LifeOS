@@ -106,7 +106,10 @@ function BottomNav() {
     );
   };
   return (
-    <nav className="fixed right-4 bottom-4 left-4 z-40 rounded-[2rem] border border-border bg-card/90 shadow-xl backdrop-blur pb-[env(safe-area-inset-bottom)]">
+    <nav
+      className="fixed right-4 left-4 z-40 rounded-[2rem] border border-border bg-card/90 shadow-xl backdrop-blur"
+      style={{ bottom: "calc(1rem + env(safe-area-inset-bottom))" }}
+    >
       <div className="mx-auto flex max-w-md">
         {tab("/", <ListChecks className="h-5 w-5" />, "Today")}
         {tab("/stats", <Flame className="h-5 w-5" />, "Stats")}
