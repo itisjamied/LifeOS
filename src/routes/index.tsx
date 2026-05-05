@@ -410,12 +410,15 @@ function Section({
   if (tasks.length === 0) return null;
   return (
     <section className="mb-6 animate-fade-up" aria-label={title}>
-      <h2 className="mb-3 flex items-center justify-center gap-2 text-xs font-bold text-muted-foreground">
-        <span className="text-primary" aria-hidden>
+      <h2 className="mb-3 flex items-center justify-center gap-2 text-m font-bold text-muted-foreground">
+        {/* <span className="text-primary" aria-hidden>
           {icon}
+        </span> */}
+        <span className="text-primary" aria-hidden>
+          {title}
         </span>
         <span className="sr-only">{title}</span>
-        <span aria-hidden>{tasks.length}</span>
+        {/* <span aria-hidden>{tasks.length}</span> */}
       </h2>
       <ul className="space-y-2">
         {tasks.map(({ task, variant, completion }) => {
