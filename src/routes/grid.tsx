@@ -1,11 +1,11 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { fetchAllRoutine, fetchProfile, type FullTask } from "@/lib/routine-data";
 import { cycleDayFor } from "@/lib/cycle";
 import { glyphFor, colorValue } from "@/lib/symbols";
 import { parseISO } from "date-fns";
-import { Sparkles } from "lucide-react";
+import { CalendarDays, Sparkles, UserRound } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 export const Route = createFileRoute("/grid")({
@@ -51,51 +51,65 @@ function GridPage() {
   }
 
   return (
-    <div className="px-3 pt-10 pb-6 animate-fade-up">
-      <header className="mb-5 flex items-start justify-between px-2">
-        <div>
-          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-            Overview
-          </p>
-          <h1 className="mt-1 text-4xl text-foreground">Cycle</h1>
-          <p className="mt-1 text-sm text-muted-foreground">28 days · scroll →</p>
+    <div className="px-4 pt-8 pb-6 animate-fade-up">
+      <header className="mb-6">
+        <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3">
+          <Link to="/settings" className="icon-button" aria-label="Settings" title="Settings">
+            <UserRound className="h-[18px] w-[18px]" />
+          </Link>
+          <div className="text-center">
+            <p className="text-[11px] font-semibold uppercase text-muted-foreground">28 days</p>
+            <h1 className="mt-1 text-3xl text-foreground">Cycle</h1>
+          </div>
+          <ThemeToggle />
         </div>
-        <ThemeToggle />
       </header>
 
-      <div className="surface overflow-x-auto">
-        <table className="border-separate border-spacing-0 text-xs lg:mx-auto py-5">
-          <thead>
-            <tr>
-              <th className="sticky left-0 z-10 bg-card px-2 py-2 text-left font-semibold text-muted-foreground" />
-              {Array.from({ length: 28 }, (_, i) => i + 1).map((d) => (
-                <th
-                  key={d}
-                  className={`min-w-[28px] px-1 py-2 text-center text-[11px] font-semibold ${
-                    d === today ? "text-primary-foreground" : "text-muted-foreground"
-                  }`}
+      <div className="surface overflow-hidden p-3">
+        <div className="mb-3 flex items-center justify-center gap-2 text-muted-foreground">
+          <CalendarDays className="h-4 w-4 text-primary" />
+          <span className="text-xs font-bold text-foreground">Day {today ?? 1}</span>
+          <span className="text-xs">/ 28</span>
+        </div>
+
+        <div className="overflow-x-auto pb-2">
+          <div
+            className="grid min-w-max items-center gap-x-1.5 gap-y-2 text-xs"
+            style={{ gridTemplateColumns: "10.5rem repeat(28, 2rem)" }}
+          >
+            <div className="sticky left-0 z-20 h-8 rounded-full bg-card/95 backdrop-blur" />
+            {Array.from({ length: 28 }, (_, i) => i + 1).map((d) => (
+              <span
+                key={d}
+                className={`flex h-8 w-8 items-center justify-center rounded-full text-[11px] font-black ${
+                  d === today
+                    ? "bg-primary text-primary-foreground shadow-md"
+                    : "bg-muted/60 text-muted-foreground"
+                }`}
+                aria-label={`Day ${d}`}
+              >
+                {d}
+              </span>
+            ))}
+
+            {routine.map((ft) => (
+              <div key={ft.task.id} className="contents">
+                <Link
+                  to="/habit/$taskId"
+                  params={{ taskId: ft.task.id }}
+                  title={ft.task.name}
+                  aria-label={ft.task.name}
+                  className="sticky left-0 z-20 flex h-10 w-[10.5rem] items-center gap-2 rounded-full bg-card/95 px-2 text-left font-bold text-foreground shadow-sm backdrop-blur"
                 >
                   <span
-                    className={`inline-flex h-6 w-6 items-center justify-center rounded-full ${
-                      d === today ? "bg-primary" : ""
-                    }`}
-                  >
-                    {d}
-                  </span>
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {routine.map((ft) => (
-              <tr key={ft.task.id}>
-                <th className="sticky left-0 z-10 whitespace-nowrap bg-card px-3 py-2 text-left text-sm font-semibold text-foreground">
-                  <span
-                    className="mr-2 inline-block h-2 w-2 rounded-full align-middle"
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-black text-white shadow-sm"
                     style={{ backgroundColor: colorValue(ft.task.color) }}
-                  />
-                  {ft.task.name}
-                </th>
+                    aria-hidden
+                  >
+                    {glyphFor(ft.variants[0]?.symbol)}
+                  </span>
+                  <span className="truncate">{ft.task.name}</span>
+                </Link>
                 {Array.from({ length: 28 }, (_, i) => i + 1).map((d) => {
                   const sched = ft.schedule.find((s) => s.cycle_day === d);
                   const variant = sched?.variant_id
@@ -103,30 +117,31 @@ function GridPage() {
                     : null;
                   const isToday = d === today;
                   return (
-                    <td
+                    <span
                       key={d}
-                      className={`min-w-[28px] border-t border-border px-1 py-1.5 text-center align-middle ${
-                        isToday ? "bg-primary/8" : ""
+                      title={`${ft.task.name}, day ${d}${variant ? `: ${variant.label}` : ""}`}
+                      className={`flex h-8 w-8 items-center justify-center rounded-full ${
+                        isToday ? "bg-primary/10 ring-2 ring-primary/30" : ""
                       }`}
                     >
                       {variant ? (
                         <span
-                          className="text-sm font-semibold leading-none"
-                          style={{ color: colorValue(ft.task.color) }}
+                          className="flex h-[1.625rem] w-[1.625rem] items-center justify-center rounded-full text-[11px] font-black leading-none text-white shadow-sm"
+                          style={{ backgroundColor: colorValue(ft.task.color) }}
                           aria-label={variant.label}
                         >
                           {glyphFor(variant.symbol)}
                         </span>
                       ) : (
-                        <span className="text-border">·</span>
+                        <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/20" />
                       )}
-                    </td>
+                    </span>
                   );
                 })}
-              </tr>
+              </div>
             ))}
-          </tbody>
-        </table>
+          </div>
+        </div>
       </div>
     </div>
   );

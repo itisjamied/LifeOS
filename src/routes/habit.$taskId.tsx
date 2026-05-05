@@ -10,7 +10,7 @@ import {
 } from "@/lib/habit-detail";
 import { parseISO, format } from "date-fns";
 import { ChevronLeft, Flame, Sparkles, Trophy } from "lucide-react";
-import { colorValue } from "@/lib/symbols";
+import { colorValue, glyphFor } from "@/lib/symbols";
 
 export const Route = createFileRoute("/habit/$taskId")({
   head: () => ({
@@ -76,30 +76,40 @@ function HabitDetailPage() {
   }
 
   return (
-    <div className="px-5 pt-10 pb-6 animate-fade-up">
-      <Link
-        to="/stats"
-        className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-      >
-        <ChevronLeft className="h-4 w-4" /> Back to stats
+    <div className="px-5 pt-8 pb-6 animate-fade-up">
+      <Link to="/stats" className="icon-button" aria-label="Back to stats" title="Back to stats">
+        <ChevronLeft className="h-4 w-4" />
       </Link>
-      <header className="mt-3 mb-6 flex items-center gap-3">
+      <header className="mt-4 mb-5 text-center">
         <span
-          className="h-4 w-4 shrink-0 rounded-full"
+          className="mx-auto flex h-14 w-14 shrink-0 items-center justify-center rounded-[1.25rem] text-2xl font-black text-white shadow-md"
           style={{ backgroundColor: colorValue(ft.task.color) }}
           aria-hidden
-        />
-        <h1 className="text-3xl text-foreground">{ft.task.name}</h1>
+        >
+          {glyphFor(ft.variants[0]?.symbol)}
+        </span>
+        <h1 className="mt-3 text-3xl text-foreground">{ft.task.name}</h1>
       </header>
 
-      <div className="grid grid-cols-3 gap-2 mb-5">
-        <Stat label="Current" value={`${current}d`} icon={<Flame className="h-3 w-3" />} />
-        <Stat label="Best" value={`${longest}d`} icon={<Trophy className="h-3 w-3" />} />
-        <Stat label="Consistency" value={`${consistency}%`} />
+      <div
+        className="habit-pill mb-5 overflow-hidden p-5 text-white shadow-lg"
+        style={{ backgroundColor: colorValue(ft.task.color) }}
+      >
+        <p className="text-center text-xs font-black uppercase text-white/70">Current</p>
+        <div className="mx-auto mt-3 flex h-32 w-32 items-center justify-center rounded-full border-[10px] border-white/75 bg-white/10 text-center shadow-inner">
+          <p className="text-4xl font-black leading-none">
+            {current}
+            <span className="ml-1 text-lg">d</span>
+          </p>
+        </div>
+        <div className="mt-5 grid grid-cols-2 gap-2 text-center">
+          <Stat label="Best" value={`${longest}d`} icon={<Trophy className="h-3 w-3" />} light />
+          <Stat label="Done" value={`${consistency}%`} icon={<Flame className="h-3 w-3" />} light />
+        </div>
       </div>
 
       <section className="surface mb-5 p-4">
-        <h2 className="mb-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+        <h2 className="mb-3 text-xs font-medium uppercase text-muted-foreground">
           90-day calendar
         </h2>
         <CalendarGrid entries={entries} taskColor={ft.task.color} />
@@ -115,7 +125,7 @@ function HabitDetailPage() {
       </section>
 
       <section className="surface p-4">
-        <h2 className="mb-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+        <h2 className="mb-3 text-xs font-medium uppercase text-muted-foreground">
           Streak breakdown
         </h2>
         {runs.length === 0 ? (
@@ -140,14 +150,34 @@ function HabitDetailPage() {
   );
 }
 
-function Stat({ label, value, icon }: { label: string; value: string; icon?: React.ReactNode }) {
+function Stat({
+  label,
+  value,
+  icon,
+  light = false,
+}: {
+  label: string;
+  value: string;
+  icon?: React.ReactNode;
+  light?: boolean;
+}) {
   return (
-    <div className="surface p-3 text-center">
-      <p className="flex items-center justify-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground">
+    <div
+      className={
+        light ? "rounded-[1rem] bg-white/15 px-2 py-2 text-center" : "surface p-3 text-center"
+      }
+    >
+      <p
+        className={`flex items-center justify-center gap-1 text-[10px] uppercase ${
+          light ? "text-white/70" : "text-muted-foreground"
+        }`}
+      >
         {icon}
         {label}
       </p>
-      <p className="mt-0.5 text-lg font-bold text-foreground">{value}</p>
+      <p className={`mt-0.5 text-lg font-bold ${light ? "text-white" : "text-foreground"}`}>
+        {value}
+      </p>
     </div>
   );
 }
@@ -168,7 +198,7 @@ function CalendarGrid({ entries, taskColor }: { entries: DayEntry[]; taskColor: 
   const cells: (DayEntry | null)[] = [...Array(dow).fill(null), ...entries];
   return (
     <div>
-      <div className="mb-1 grid grid-cols-7 gap-1 text-center text-[9px] uppercase tracking-wider text-muted-foreground">
+      <div className="mb-1 grid grid-cols-7 gap-1 text-center text-[9px] uppercase text-muted-foreground">
         {["M", "T", "W", "T", "F", "S", "S"].map((d, i) => (
           <span key={i}>{d}</span>
         ))}

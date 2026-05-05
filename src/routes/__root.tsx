@@ -9,7 +9,7 @@ import {
 import appCss from "../styles.css?url";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { Toaster } from "@/components/ui/sonner";
-import { CalendarDays, ListChecks, LogOut, Pencil, Flame } from "lucide-react";
+import { ListChecks, Settings, Pencil, Flame } from "lucide-react";
 
 function NotFoundComponent() {
   return (
@@ -39,7 +39,7 @@ export const Route = createRootRoute({
         content:
           "Mobile-first 28-day maintenance routine tracker. Wake up, see what's due, check it off.",
       },
-      { name: "theme-color", content: "#f5f1e6" },
+      { name: "theme-color", content: "#eff6fb" },
       { property: "og:title", content: "Cycle — your 28-day routine" },
       { name: "twitter:title", content: "Cycle — your 28-day routine" },
       {
@@ -88,23 +88,30 @@ function BottomNav() {
     return (
       <Link
         to={to}
-        className={`flex flex-1 flex-col items-center gap-0.5 py-2.5 text-xs transition-colors ${
-          active ? "text-primary" : "text-muted-foreground"
+        aria-label={label}
+        title={label}
+        className={`flex flex-1 items-center justify-center py-3 transition-colors ${
+          active ? "text-primary" : "text-muted-foreground hover:text-foreground"
         }`}
       >
-        {icon}
-        <span>{label}</span>
+        <span
+          className={`flex h-10 w-10 items-center justify-center rounded-full transition-all ${
+            active ? "bg-primary/15 shadow-sm" : ""
+          }`}
+        >
+          {icon}
+        </span>
+        <span className="sr-only">{label}</span>
       </Link>
     );
   };
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-card/95 backdrop-blur pb-[env(safe-area-inset-bottom)]">
+    <nav className="fixed right-4 bottom-4 left-4 z-40 rounded-[2rem] border border-border bg-card/90 shadow-xl backdrop-blur pb-[env(safe-area-inset-bottom)]">
       <div className="mx-auto flex max-w-md">
         {tab("/", <ListChecks className="h-5 w-5" />, "Today")}
-        {tab("/grid", <CalendarDays className="h-5 w-5" />, "Cycle")}
         {tab("/stats", <Flame className="h-5 w-5" />, "Stats")}
         {tab("/manage", <Pencil className="h-5 w-5" />, "Edit")}
-        {tab("/settings", <LogOut className="h-5 w-5" />, "Settings")}
+        {tab("/settings", <Settings className="h-5 w-5" />, "Settings")}
       </div>
     </nav>
   );

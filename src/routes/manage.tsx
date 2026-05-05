@@ -41,6 +41,14 @@ const TIME_OPTIONS: { value: string; label: string; icon: React.ReactNode }[] = 
   { value: "other", label: "Other", icon: <CircleDashed className="h-3.5 w-3.5" /> },
 ];
 
+function moveItem<T>(items: T[], from: number, to: number): T[] {
+  if (to < 0 || to >= items.length || from === to) return items;
+  const next = [...items];
+  const [moved] = next.splice(from, 1);
+  next.splice(to, 0, moved);
+  return next;
+}
+
 function ManagePage() {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
@@ -163,10 +171,10 @@ function ManagePage() {
     <div className="px-5 pt-10 animate-fade-up">
       <header className="mb-7 flex items-start justify-between">
         <div>
-          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Edit</p>
+          <p className="text-xs font-medium uppercase text-muted-foreground">Edit</p>
           <h1 className="mt-1 text-4xl text-foreground">Manage</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            {reordering ? "Drag tasks to reorder, then save." : "Tap a task to edit."}
+            {reordering ? "Move tasks, then save." : "Tap a task to edit."}
           </p>
         </div>
         <ThemeToggle />
@@ -200,7 +208,7 @@ function ManagePage() {
           <button
             type="button"
             onClick={startReorder}
-            className="ml-auto inline-flex items-center gap-1 rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+            className=" mr-auto lg:ml-auto inline-flex items-center gap-1 rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground mt-10"
           >
             <ArrowUpDown className="h-3.5 w-3.5" /> Reorder
           </button>
@@ -256,6 +264,17 @@ function ManagePage() {
                   </span>
                 </span>
               </button>
+              {reordering && draftOrder && (
+                <ReorderButtons
+                  index={idx}
+                  count={draftOrder.length}
+                  label={ft.task.name}
+                  onMove={(from, to) => {
+                    setDraftOrder((current) => (current ? moveItem(current, from, to) : current));
+                    setDragIdx(null);
+                  }}
+                />
+              )}
             </li>
           );
         })}
@@ -277,6 +296,41 @@ function ManagePage() {
 
 function timeLabel(v: string) {
   return TIME_OPTIONS.find((t) => t.value === v)?.label ?? v;
+}
+
+function ReorderButtons({
+  index,
+  count,
+  label,
+  onMove,
+}: {
+  index: number;
+  count: number;
+  label: string;
+  onMove: (from: number, to: number) => void;
+}) {
+  return (
+    <div className="flex shrink-0 flex-col overflow-hidden rounded-full border border-border bg-card shadow-sm">
+      <button
+        type="button"
+        disabled={index === 0}
+        onClick={() => onMove(index, index - 1)}
+        className="flex h-8 w-9 items-center justify-center text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-30"
+        aria-label={`Move ${label} up`}
+      >
+        <ChevronUp className="h-4 w-4" />
+      </button>
+      <button
+        type="button"
+        disabled={index === count - 1}
+        onClick={() => onMove(index, index + 1)}
+        className="flex h-8 w-9 items-center justify-center border-t border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-30"
+        aria-label={`Move ${label} down`}
+      >
+        <ChevronDown className="h-4 w-4" />
+      </button>
+    </div>
+  );
 }
 
 // ----------------- Task editor -----------------
@@ -536,7 +590,7 @@ function TaskEditor({
 
       {/* Variants */}
       <section className="mb-5">
-        <h2 className="mb-3 flex items-center justify-between text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+        <h2 className="mb-3 flex items-center justify-between text-sm font-semibold uppercase text-muted-foreground">
           Variants
           <div className="flex items-center gap-1.5">
             {variants.length > 1 && !vReordering && (
@@ -595,7 +649,18 @@ function TaskEditor({
                 >
                   {glyphFor(v.symbol)}
                 </span>
-                <span className="text-sm font-semibold text-foreground">{v.label}</span>
+                <span className="min-w-0 flex-1 truncate text-sm font-semibold text-foreground">
+                  {v.label}
+                </span>
+                <ReorderButtons
+                  index={i}
+                  count={vDraft.length}
+                  label={v.label}
+                  onMove={(from, to) => {
+                    setVDraft((current) => (current ? moveItem(current, from, to) : current));
+                    setVDragIdx(null);
+                  }}
+                />
               </li>
             ))}
           </ul>
@@ -621,7 +686,7 @@ function TaskEditor({
 
       {/* Schedule */}
       <section className="mb-5">
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+        <h2 className="mb-3 text-sm font-semibold uppercase text-muted-foreground">
           28-day schedule
         </h2>
         <div className="surface p-3">
@@ -635,17 +700,23 @@ function TaskEditor({
                   <button
                     type="button"
                     onClick={() => setActiveDay(isOpen ? null : d)}
-                    className={`flex h-12 w-full flex-col items-center justify-center rounded-lg border text-[10px] transition-all ${
+                    className={`relative flex h-12 w-full flex-col items-center justify-center overflow-hidden rounded-lg border text-[10px] transition-all ${
                       variant
-                        ? "border-transparent text-white"
+                        ? "border-border text-foreground"
                         : isOpen
                           ? "border-primary bg-card"
                           : "border-border bg-card text-muted-foreground hover:border-primary/50"
                     }`}
-                    style={variant ? { backgroundColor: colorValue(color) } : undefined}
                   >
-                    <span className="text-[10px] opacity-80">{d}</span>
-                    <span className="text-base font-bold leading-none">
+                    {variant && (
+                      <span
+                        aria-hidden
+                        className="absolute inset-0 opacity-50"
+                        style={{ backgroundColor: colorValue(color) }}
+                      />
+                    )}
+                    <span className="relative text-[10px] opacity-80">{d}</span>
+                    <span className="relative text-base font-bold leading-none">
                       {variant ? glyphFor(variant.symbol) : "·"}
                     </span>
                   </button>
@@ -800,9 +871,7 @@ function VariantEditor({
 
       {/* Steps */}
       <div className="mt-4">
-        <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-          Sub-steps
-        </p>
+        <p className="mb-2 text-[11px] font-semibold uppercase text-muted-foreground">Sub-steps</p>
         <ul className="space-y-1.5">
           {steps.map((s, i) => (
             <li
