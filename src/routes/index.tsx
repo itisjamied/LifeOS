@@ -2,7 +2,6 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/integrations/supabase/client";
-import { seedRoutineIfEmpty } from "@/lib/seed-routine";
 import {
   fetchAllRoutine,
   fetchCompletionsForDate,
@@ -74,7 +73,6 @@ function TodayPage() {
     (async () => {
       setBusy(true);
       try {
-        await seedRoutineIfEmpty(user.id);
         const [data, profile] = await Promise.all([
           fetchAllRoutine(user.id),
           fetchProfile(user.id),
