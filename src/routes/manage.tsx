@@ -358,6 +358,12 @@ function TaskEditor({
   });
   const [busy, setBusy] = useState(false);
   const [activeDay, setActiveDay] = useState<number | null>(null);
+  const [dayMenuPosition, setDayMenuPosition] = useState<{
+    left: number;
+    bottom: number;
+    maxHeight: number;
+    width: number;
+  } | null>(null);
   const [vReordering, setVReordering] = useState(false);
   const [vDraft, setVDraft] = useState<VariantRow[] | null>(null);
   const [vDragIdx, setVDragIdx] = useState<number | null>(null);
@@ -448,10 +454,55 @@ function TaskEditor({
     setVDragIdx(i);
   };
 
+  const toggleDayMenu = (day: number, target: HTMLButtonElement) => {
+    if (activeDay === day) {
+      setActiveDay(null);
+      setDayMenuPosition(null);
+      return;
+    }
+
+    // get the day clicked button positions
+    const rect = target.getBoundingClientRect();
+    // kep menu 12px away from viewpoet edge
+    const viewportPadding = 12;
+
+    //get size of screen
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+
+    //set width for popup
+    const width = Math.min(176, Math.max(0, viewportWidth - viewportPadding * 2));
+
+    //center popup horizontaly to button but keep it in viewport
+    const centeredLeft = rect.left + rect.width / 2 - width / 2;
+
+    //clamp popup so it doesnt go off left or right edge of screen
+    const left = Math.min(
+      Math.max(centeredLeft, viewportPadding),
+      Math.max(viewportPadding, viewportWidth - viewportPadding - width),
+    );
+
+    setDayMenuPosition({
+      //horizontal position
+      left,
+
+      // verticle position
+      bottom: viewportHeight - rect.bottom - 100,
+
+      //max height
+      maxHeight: Math.max(80, rect.top - viewportPadding),
+
+      //width
+      width,
+    });
+    setActiveDay(day);
+  };
+
   const setDay = async (day: number, variantId: string | null) => {
     const prev = schedule[day];
     setSchedule((m) => ({ ...m, [day]: variantId }));
     setActiveDay(null);
+    setDayMenuPosition(null);
     // Find existing schedule row
     const existing = full.schedule.find((s) => s.cycle_day === day);
     if (variantId === null) {
@@ -699,7 +750,7 @@ function TaskEditor({
                 <div key={d} className="relative">
                   <button
                     type="button"
-                    onClick={() => setActiveDay(isOpen ? null : d)}
+                    onClick={(e) => toggleDayMenu(d, e.currentTarget)}
                     className={`relative flex h-12 w-full flex-col items-center justify-center overflow-hidden rounded-lg border text-[10px] transition-all ${
                       variant
                         ? "border-border text-foreground"
@@ -720,8 +771,11 @@ function TaskEditor({
                       {variant ? glyphFor(variant.symbol) : "·"}
                     </span>
                   </button>
-                  {isOpen && (
-                    <div className="surface absolute left-1/2 top-full z-30 mt-1.5 w-44 -translate-x-1/2 p-1 shadow-lg animate-fade-up">
+                  {isOpen && dayMenuPosition && (
+                    <div
+                      className="surface fixed z-30 overflow-y-auto overscroll-contain p-1 shadow-lg animate-fade-up"
+                      style={dayMenuPosition}
+                    >
                       <button
                         type="button"
                         onClick={() => setDay(d, null)}
