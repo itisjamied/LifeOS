@@ -46,6 +46,124 @@ export type Database = {
           },
         ];
       };
+      journal_attachments: {
+        Row: {
+          created_at: string;
+          file_name: string;
+          file_size: number;
+          id: string;
+          mime_type: string;
+          note_id: string;
+          storage_path: string;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          file_name: string;
+          file_size?: number;
+          id?: string;
+          mime_type?: string;
+          note_id: string;
+          storage_path: string;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string;
+          file_name?: string;
+          file_size?: number;
+          id?: string;
+          mime_type?: string;
+          note_id?: string;
+          storage_path?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "journal_attachments_note_id_fkey";
+            columns: ["note_id"];
+            isOneToOne: false;
+            referencedRelation: "journal_notes";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      journal_folders: {
+        Row: {
+          created_at: string;
+          id: string;
+          name: string;
+          sort_order: number;
+          updated_at: string;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          id?: string;
+          name: string;
+          sort_order?: number;
+          updated_at?: string;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string;
+          id?: string;
+          name?: string;
+          sort_order?: number;
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
+      journal_notes: {
+        Row: {
+          content_html: string;
+          content_text: string;
+          created_at: string;
+          entry_date: string;
+          entry_time: string;
+          folder_id: string | null;
+          id: string;
+          tags: string[];
+          title: string;
+          updated_at: string;
+          user_id: string;
+        };
+        Insert: {
+          content_html?: string;
+          content_text?: string;
+          created_at?: string;
+          entry_date?: string;
+          entry_time?: string;
+          folder_id?: string | null;
+          id?: string;
+          tags?: string[];
+          title?: string;
+          updated_at?: string;
+          user_id: string;
+        };
+        Update: {
+          content_html?: string;
+          content_text?: string;
+          created_at?: string;
+          entry_date?: string;
+          entry_time?: string;
+          folder_id?: string | null;
+          id?: string;
+          tags?: string[];
+          title?: string;
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "journal_notes_folder_id_fkey";
+            columns: ["folder_id"];
+            isOneToOne: false;
+            referencedRelation: "journal_folders";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       profiles: {
         Row: {
           created_at: string;

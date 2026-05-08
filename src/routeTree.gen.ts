@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as StatsRouteImport } from './routes/stats'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ManageRouteImport } from './routes/manage'
+import { Route as JournalRouteImport } from './routes/journal'
 import { Route as GridRouteImport } from './routes/grid'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as IndexRouteImport } from './routes/index'
@@ -30,6 +31,11 @@ const SettingsRoute = SettingsRouteImport.update({
 const ManageRoute = ManageRouteImport.update({
   id: '/manage',
   path: '/manage',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const JournalRoute = JournalRouteImport.update({
+  id: '/journal',
+  path: '/journal',
   getParentRoute: () => rootRouteImport,
 } as any)
 const GridRoute = GridRouteImport.update({
@@ -57,6 +63,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/grid': typeof GridRoute
+  '/journal': typeof JournalRoute
   '/manage': typeof ManageRoute
   '/settings': typeof SettingsRoute
   '/stats': typeof StatsRoute
@@ -66,6 +73,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/grid': typeof GridRoute
+  '/journal': typeof JournalRoute
   '/manage': typeof ManageRoute
   '/settings': typeof SettingsRoute
   '/stats': typeof StatsRoute
@@ -76,6 +84,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/grid': typeof GridRoute
+  '/journal': typeof JournalRoute
   '/manage': typeof ManageRoute
   '/settings': typeof SettingsRoute
   '/stats': typeof StatsRoute
@@ -87,6 +96,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/grid'
+    | '/journal'
     | '/manage'
     | '/settings'
     | '/stats'
@@ -96,6 +106,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/grid'
+    | '/journal'
     | '/manage'
     | '/settings'
     | '/stats'
@@ -105,6 +116,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/grid'
+    | '/journal'
     | '/manage'
     | '/settings'
     | '/stats'
@@ -115,6 +127,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthRoute: typeof AuthRoute
   GridRoute: typeof GridRoute
+  JournalRoute: typeof JournalRoute
   ManageRoute: typeof ManageRoute
   SettingsRoute: typeof SettingsRoute
   StatsRoute: typeof StatsRoute
@@ -142,6 +155,13 @@ declare module '@tanstack/react-router' {
       path: '/manage'
       fullPath: '/manage'
       preLoaderRoute: typeof ManageRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/journal': {
+      id: '/journal'
+      path: '/journal'
+      fullPath: '/journal'
+      preLoaderRoute: typeof JournalRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/grid': {
@@ -179,6 +199,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthRoute: AuthRoute,
   GridRoute: GridRoute,
+  JournalRoute: JournalRoute,
   ManageRoute: ManageRoute,
   SettingsRoute: SettingsRoute,
   StatsRoute: StatsRoute,
