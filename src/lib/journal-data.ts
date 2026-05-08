@@ -1,0 +1,171 @@
+import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
+import { todayISO } from "@/lib/cycle";
+
+export const JOURNAL_ATTACHMENTS_BUCKET = "journal-attachments";
+
+export type JournalFolderRow = Database["public"]["Tables"]["journal_folders"]["Row"];
+export type JournalNoteRow = Database["public"]["Tables"]["journal_notes"]["Row"];
+export type JournalNoteUpdate = Database["public"]["Tables"]["journal_notes"]["Update"];
+export type JournalAttachmentRow = Database["public"]["Tables"]["journal_attachments"]["Row"];
+
+export interface JournalNoteWithAttachments extends JournalNoteRow {
+  attachments: JournalAttachmentRow[];
+}
+
+export async function fetchJournal(userId: string) {
+  const [{ data: folders, error: foldersError }, { data: notes, error: notesError }] =
+    await Promise.all([
+      supabase
+        .from("journal_folders")
+        .select("*")
+        .eq("user_id", userId)
+        .order("sort_order", { ascending: true })
+        .order("name", { ascending: true }),
+      supabase
+        .from("journal_notes")
+        .select("*, journal_attachments(*)")
+        .eq("user_id", userId)
+        .order("updated_at", { ascending: false }),
+    ]);
+
+  if (foldersError) throw foldersError;
+  if (notesError) throw notesError;
+
+  return {
+    folders: folders ?? [],
+    notes: (
+      (notes ?? []) as unknown as (JournalNoteRow & {
+        journal_attachments?: JournalAttachmentRow[];
+      })[]
+    ).map(({ journal_attachments, ...note }) => ({
+      ...note,
+      attachments: journal_attachments ?? [],
+    })),
+  };
+}
+
+export async function createJournalFolder(userId: string, name: string, sortOrder: number) {
+  const { data, error } = await supabase
+    .from("journal_folders")
+    .insert({ user_id: userId, name, sort_order: sortOrder })
+    .select("*")
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function renameJournalFolder(folderId: string, name: string) {
+  const { data, error } = await supabase
+    .from("journal_folders")
+    .update({ name })
+    .eq("id", folderId)
+    .select("*")
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function deleteJournalFolder(folderId: string) {
+  const { error } = await supabase.from("journal_folders").delete().eq("id", folderId);
+  if (error) throw error;
+}
+
+export async function createJournalNote(
+  userId: string,
+  folderId?: string | null,
+  entryDate = todayISO(),
+) {
+  const { data, error } = await supabase
+    .from("journal_notes")
+    .insert({
+      user_id: userId,
+      folder_id: folderId ?? null,
+      title: "New note",
+      content_html: "",
+      content_text: "",
+      tags: [],
+      entry_date: entryDate,
+      entry_time: new Date().toTimeString().slice(0, 5),
+    })
+    .select("*")
+    .single();
+  if (error) throw error;
+  return { ...data, attachments: [] };
+}
+
+export async function updateJournalNote(noteId: string, patch: JournalNoteUpdate) {
+  const { data, error } = await supabase
+    .from("journal_notes")
+    .update(patch)
+    .eq("id", noteId)
+    .select("*")
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function deleteJournalNote(noteId: string) {
+  const { data: attachments } = await supabase
+    .from("journal_attachments")
+    .select("storage_path")
+    .eq("note_id", noteId);
+
+  if (attachments?.length) {
+    await supabase.storage
+      .from(JOURNAL_ATTACHMENTS_BUCKET)
+      .remove(attachments.map((attachment) => attachment.storage_path));
+  }
+
+  const { error } = await supabase.from("journal_notes").delete().eq("id", noteId);
+  if (error) throw error;
+}
+
+export async function addJournalAttachment({
+  userId,
+  noteId,
+  file,
+}: {
+  userId: string;
+  noteId: string;
+  file: File;
+}) {
+  const safeName = file.name.replace(/[^\w.\- ]+/g, "").trim() || "attachment";
+  const storagePath = `${userId}/${noteId}/${Date.now()}-${safeName}`;
+  const { error: uploadError } = await supabase.storage
+    .from(JOURNAL_ATTACHMENTS_BUCKET)
+    .upload(storagePath, file, {
+      contentType: file.type || "application/octet-stream",
+      upsert: false,
+    });
+  if (uploadError) throw uploadError;
+
+  const { data, error } = await supabase
+    .from("journal_attachments")
+    .insert({
+      user_id: userId,
+      note_id: noteId,
+      file_name: file.name,
+      mime_type: file.type || "application/octet-stream",
+      file_size: file.size,
+      storage_path: storagePath,
+    })
+    .select("*")
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function deleteJournalAttachment(attachment: JournalAttachmentRow) {
+  await supabase.storage.from(JOURNAL_ATTACHMENTS_BUCKET).remove([attachment.storage_path]);
+  const { error } = await supabase.from("journal_attachments").delete().eq("id", attachment.id);
+  if (error) throw error;
+}
+
+export async function signedAttachmentUrl(storagePath: string) {
+  const { data, error } = await supabase.storage
+    .from(JOURNAL_ATTACHMENTS_BUCKET)
+    .createSignedUrl(storagePath, 60 * 60);
+  if (error) throw error;
+  return data.signedUrl;
+}
