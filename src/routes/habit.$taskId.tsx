@@ -8,15 +8,25 @@ import {
   type DayEntry,
   type StreakRun,
 } from "@/lib/habit-detail";
-import { parseISO, format } from "date-fns";
+import {
+  addDays,
+  differenceInCalendarDays,
+  isAfter,
+  isToday,
+  parseISO,
+  format,
+  startOfDay,
+} from "date-fns";
 import { ChevronLeft, Flame, Sparkles, Trophy } from "lucide-react";
 import { colorValue, glyphFor } from "@/lib/symbols";
+
+const HABIT_DETAIL_WINDOW_DAYS = 28;
 
 export const Route = createFileRoute("/habit/$taskId")({
   head: () => ({
     meta: [
       { title: "Habit detail — Cycle" },
-      { name: "description", content: "Day-by-day calendar and streak breakdown for a habit." },
+      { name: "description", content: "28-day calendar and streak breakdown for a habit." },
     ],
   }),
   component: HabitDetailPage,
@@ -45,9 +55,17 @@ function HabitDetailPage() {
       setFt(found);
       if (found) {
         const cs = profile?.cycle_start_date ? parseISO(profile.cycle_start_date) : new Date();
-        const e = await fetchHabitHistory(user.id, found, cs);
+        const calendarStart = currentCycleStartFor(cs);
+        const e = await fetchHabitHistory(
+          user.id,
+          found,
+          cs,
+          HABIT_DETAIL_WINDOW_DAYS,
+          calendarStart,
+        );
+        const measuredEntries = e.filter(isMeasuredEntry);
         setEntries(e);
-        setRuns(computeStreakRuns(e));
+        setRuns(computeStreakRuns(measuredEntries));
       }
     })();
   }, [user, taskId]);
@@ -60,18 +78,19 @@ function HabitDetailPage() {
     );
   }
 
-  const scheduled = entries.filter((e) => e.scheduled);
+  const measuredEntries = entries.filter(isMeasuredEntry);
+  const scheduled = measuredEntries.filter((e) => e.scheduled);
   const completed = scheduled.filter((e) => e.done);
   const consistency =
-    scheduled.length === 0 ? 0 : Math.round((completed.length / scheduled.length) * 100);
+    scheduled.length === 0 ? 100 : Math.round((completed.length / scheduled.length) * 100);
   const longest = runs[0]?.length ?? 0;
   // Current streak: walk backwards from today.
   let current = 0;
-  for (let i = entries.length - 1; i >= 0; i--) {
-    const e = entries[i];
+  for (let i = measuredEntries.length - 1; i >= 0; i--) {
+    const e = measuredEntries[i];
     if (!e.scheduled) continue;
     if (e.done) current++;
-    else if (i !== entries.length - 1) break;
+    else if (i !== measuredEntries.length - 1) break;
     else continue; // today not yet done — ignore
   }
 
@@ -110,16 +129,23 @@ function HabitDetailPage() {
 
       <section className="surface mb-5 p-4">
         <h2 className="mb-3 text-xs font-medium uppercase text-muted-foreground">
-          90-day calendar
+          28-day calendar
         </h2>
         <CalendarGrid entries={entries} taskColor={ft.task.color} />
-        <div className="mt-3 flex items-center gap-3 text-[11px] text-muted-foreground">
+        <div className="mt-3 flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
           <Legend color={ft.task.color} label="Done" />
           <span className="inline-flex items-center gap-1">
-            <span className="h-3 w-3 rounded-sm border border-border bg-muted" /> Scheduled
+            <span
+              className="h-3 w-3 rounded-sm border opacity-35"
+              style={{
+                borderColor: colorValue(ft.task.color),
+                backgroundColor: colorValue(ft.task.color),
+              }}
+            />{" "}
+            Expected
           </span>
           <span className="inline-flex items-center gap-1">
-            <span className="h-3 w-3 rounded-sm bg-muted/30" /> Off
+            <span className="h-3 w-3 rounded-sm border border-border bg-transparent" /> Off
           </span>
         </div>
       </section>
@@ -148,6 +174,18 @@ function HabitDetailPage() {
       </section>
     </div>
   );
+}
+
+function isMeasuredEntry(entry: DayEntry) {
+  return !isAfter(entry.date, new Date()) && (!isToday(entry.date) || entry.done);
+}
+
+function currentCycleStartFor(cycleStart: Date) {
+  const firstCycleDay = startOfDay(cycleStart);
+  const today = startOfDay(new Date());
+  const daysSinceStart = Math.max(0, differenceInCalendarDays(today, firstCycleDay));
+  const cyclesSinceStart = Math.floor(daysSinceStart / HABIT_DETAIL_WINDOW_DAYS);
+  return addDays(firstCycleDay, cyclesSinceStart * HABIT_DETAIL_WINDOW_DAYS);
 }
 
 function Stat({
@@ -192,10 +230,10 @@ function Legend({ color, label }: { color: string; label: string }) {
 }
 
 function CalendarGrid({ entries, taskColor }: { entries: DayEntry[]; taskColor: string }) {
-  // Pad the front so the first cell aligns to weekday (Mon-first).
-  const first = entries[0]?.date ?? new Date();
-  const dow = (first.getDay() + 6) % 7; // 0 = Mon
-  const cells: (DayEntry | null)[] = [...Array(dow).fill(null), ...entries];
+  const habitColor = colorValue(taskColor);
+  const rows: DayEntry[][] = [];
+  for (let i = 0; i < entries.length; i += 7) rows.push(entries.slice(i, i + 7));
+
   return (
     <div>
       <div className="mb-1 grid grid-cols-7 gap-1 text-center text-[9px] uppercase text-muted-foreground">
@@ -203,31 +241,48 @@ function CalendarGrid({ entries, taskColor }: { entries: DayEntry[]; taskColor: 
           <span key={i}>{d}</span>
         ))}
       </div>
-      <div className="grid grid-cols-7 gap-1">
-        {cells.map((e, i) => {
-          if (!e) return <span key={i} className="aspect-square" />;
-          const title = `${format(e.date, "MMM d")} — ${e.scheduled ? (e.done ? "Done" : "Missed") : "Off"}`;
-          if (!e.scheduled) {
-            return <span key={i} title={title} className="aspect-square rounded-sm bg-muted/30" />;
-          }
-          if (e.done) {
-            return (
-              <span
-                key={i}
-                title={title}
-                className="aspect-square rounded-sm"
-                style={{ backgroundColor: colorValue(taskColor) }}
-              />
-            );
-          }
-          return (
-            <span
-              key={i}
-              title={title}
-              className="aspect-square rounded-sm border border-border bg-muted"
-            />
-          );
-        })}
+      <div className="space-y-1">
+        {rows.map((row) => (
+          <div key={row[0]?.iso} className="grid grid-cols-7 gap-1">
+            {row.map((e) => {
+              const status = e.scheduled
+                ? e.done
+                  ? "Done"
+                  : isAfter(e.date, new Date())
+                    ? "Expected"
+                    : "Missed"
+                : "Off";
+              const title = `${format(e.date, "MMM d")} — ${status}`;
+              if (!e.scheduled) {
+                return (
+                  <span
+                    key={e.iso}
+                    title={title}
+                    className="aspect-square rounded-sm border border-border bg-transparent"
+                  />
+                );
+              }
+              if (e.done) {
+                return (
+                  <span
+                    key={e.iso}
+                    title={title}
+                    className="aspect-square rounded-sm border border-transparent"
+                    style={{ backgroundColor: habitColor }}
+                  />
+                );
+              }
+              return (
+                <span
+                  key={e.iso}
+                  title={title}
+                  className="aspect-square rounded-sm border opacity-35"
+                  style={{ borderColor: habitColor, backgroundColor: habitColor }}
+                />
+              );
+            })}
+          </div>
+        ))}
       </div>
     </div>
   );

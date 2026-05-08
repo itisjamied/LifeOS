@@ -8,11 +8,13 @@ import { Flame, Sparkles, Trophy, ArrowUpDown, UserRound } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { colorValue, glyphFor } from "@/lib/symbols";
 
+const STATS_WINDOW_DAYS = 28;
+
 export const Route = createFileRoute("/stats")({
   head: () => ({
     meta: [
       { title: "Stats — Cycle" },
-      { name: "description", content: "Your habit streaks and consistency over the last 90 days." },
+      { name: "description", content: "Your habit streaks and consistency over the last 28 days." },
     ],
   }),
   component: StatsPage,
@@ -39,7 +41,7 @@ function StatsPage() {
       const [rt, profile] = await Promise.all([fetchAllRoutine(user.id), fetchProfile(user.id)]);
       setRoutine(rt);
       const cs = profile?.cycle_start_date ? parseISO(profile.cycle_start_date) : new Date();
-      const s = await computeStats(user.id, rt as FullTask[], cs);
+      const s = await computeStats(user.id, rt as FullTask[], cs, STATS_WINDOW_DAYS);
       setStats(s);
     })();
   }, [user]);
@@ -96,7 +98,7 @@ function StatsPage() {
             <UserRound className="h-[18px] w-[18px]" />
           </Link>
           <div className="text-center">
-            <p className="text-[11px] font-semibold uppercase text-muted-foreground">90 days</p>
+            <p className="text-[11px] font-semibold uppercase text-muted-foreground">28 days</p>
             <h1 className="mt-1 text-3xl text-foreground">Stats</h1>
           </div>
           <ThemeToggle />

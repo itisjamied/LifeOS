@@ -121,6 +121,12 @@ function TodayPage() {
   const pmTasks = todaysTasks.filter((t) => t.task.time_of_day === "pm");
   const anyTasks = todaysTasks.filter((t) => t.task.time_of_day === "any");
   const otherTasks = todaysTasks.filter((t) => t.task.time_of_day === "other");
+  const unfinishedCounts = {
+    am: countUnfinished(amTasks),
+    any: countUnfinished(anyTasks),
+    pm: countUnfinished(pmTasks),
+    other: countUnfinished(otherTasks),
+  };
   const visibleTaskCount =
     timeFilter === "all"
       ? todaysTasks.length
@@ -194,9 +200,11 @@ function TodayPage() {
     <div className="px-5 pt-8 animate-fade-up">
       <header className="mb-6">
         <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3">
-          <Link to="/settings" className="icon-button" aria-label="Settings" title="Settings">
-            <UserRound className="h-[18px] w-[18px]" />
-          </Link>
+          <div className="h-full flex flex-col justify-center">
+            <Link to="/settings" className="icon-button" aria-label="Settings" title="Settings">
+              <UserRound className="h-[18px] w-[18px]" />
+            </Link>
+          </div>
           <div className="text-center">
             <p className="text-[11px] font-semibold uppercase text-muted-foreground">
               {format(viewDate, "EEE, MMM d")}
@@ -205,11 +213,11 @@ function TodayPage() {
               {isViewingToday ? "Today" : format(viewDate, "MMM d")}
             </h1>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col gap-y-4 items-center gap-2">
+            <ThemeToggle />
             <Link to="/grid" className="icon-button" aria-label="Cycle grid" title="Cycle grid">
               <CalendarDays className="h-[18px] w-[18px]" />
             </Link>
-            <ThemeToggle />
           </div>
         </div>
       </header>
@@ -261,6 +269,7 @@ function TodayPage() {
           pm: pmTasks.length,
           other: otherTasks.length,
         }}
+        unfinishedCounts={unfinishedCounts}
       />
 
       {todaysTasks.length === 0 ? (
@@ -328,10 +337,12 @@ function TodayPage() {
 function TimeStrip({
   active,
   counts,
+  unfinishedCounts,
   onSelect,
 }: {
   active: TimeFilter;
   counts: Record<Exclude<TimeFilter, "all">, number>;
+  unfinishedCounts: Record<Exclude<TimeFilter, "all">, number>;
   onSelect: (filter: TimeFilter) => void;
 }) {
   const items = [
@@ -360,6 +371,7 @@ function TimeStrip({
       </button>
       {items.map((item) => {
         const count = counts[item.key];
+        const unfinishedCount = unfinishedCounts[item.key];
         const selected = active === item.key;
         return (
           <button
@@ -378,7 +390,7 @@ function TimeStrip({
             }`}
           >
             {item.icon}
-            {count > 0 && !selected && (
+            {unfinishedCount > 0 && !selected && (
               <span className="absolute -right-0.5 -bottom-0.5 h-2.5 w-2.5 rounded-full border-2 border-background bg-primary" />
             )}
           </button>
@@ -386,6 +398,10 @@ function TimeStrip({
       })}
     </div>
   );
+}
+
+function countUnfinished(tasks: TodayTask[]) {
+  return tasks.filter((t) => !t.completion?.done).length;
 }
 
 function Section({

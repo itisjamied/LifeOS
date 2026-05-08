@@ -1,4 +1,4 @@
-import { format, subDays } from "date-fns";
+import { addDays, format, isBefore, isToday, startOfDay, subDays } from "date-fns";
 import type { FullTask } from "./routine-data";
 import { cycleDayFor } from "./cycle";
 import { supabase } from "@/integrations/supabase/client";
@@ -15,27 +15,34 @@ export async function fetchHabitHistory(
   ft: FullTask,
   cycleStart: Date,
   windowDays = 90,
+  startDate?: Date,
 ): Promise<DayEntry[]> {
-  const since = format(subDays(new Date(), windowDays - 1), "yyyy-MM-dd");
+  const firstDate = startDate ?? subDays(new Date(), windowDays - 1);
+  const lastDate = startDate ? addDays(firstDate, windowDays - 1) : new Date();
+  const since = format(firstDate, "yyyy-MM-dd");
+  const until = format(lastDate, "yyyy-MM-dd");
   const { data } = await supabase
     .from("completions")
     .select("date, done")
     .eq("user_id", userId)
     .eq("task_id", ft.task.id)
-    .gte("date", since);
+    .gte("date", since)
+    .lte("date", until);
   const doneSet = new Set((data ?? []).filter((c) => c.done).map((c) => c.date));
 
   const today = new Date();
+  const cycleStartDay = startOfDay(cycleStart);
   const entries: DayEntry[] = [];
-  for (let i = windowDays - 1; i >= 0; i--) {
-    const d = subDays(today, i);
+  for (let i = 0; i < windowDays; i++) {
+    const d = startDate ? addDays(firstDate, i) : subDays(today, windowDays - 1 - i);
     const day = cycleDayFor(d, cycleStart);
     const sched = ft.schedule.find((s) => s.cycle_day === day);
     const iso = format(d, "yyyy-MM-dd");
+    const isBeforeCycleStart = isBefore(startOfDay(d), cycleStartDay);
     entries.push({
       date: d,
       iso,
-      scheduled: !!sched?.variant_id,
+      scheduled: !isBeforeCycleStart && !!sched?.variant_id,
       done: doneSet.has(iso),
     });
   }
@@ -55,6 +62,7 @@ export function computeStreakRuns(entries: DayEntry[]): StreakRun[] {
   let len = 0;
   for (const e of entries) {
     if (!e.scheduled) continue;
+    if (isToday(e.date) && !e.done) continue;
     if (e.done) {
       if (!curStart) curStart = e.date;
       curEnd = e.date;

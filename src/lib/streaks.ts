@@ -1,4 +1,4 @@
-import { format, subDays, parseISO } from "date-fns";
+import { format, isBefore, parseISO, startOfDay, subDays } from "date-fns";
 import type { FullTask } from "./routine-data";
 import { cycleDayFor } from "./cycle";
 import { supabase } from "@/integrations/supabase/client";
@@ -9,8 +9,8 @@ export interface TaskStats {
   color: string;
   currentStreak: number;
   longestStreak: number;
-  scheduledCount: number; // last 90 days scheduled count
-  completedCount: number; // last 90 days completed count
+  scheduledCount: number; // scheduled count within the requested window
+  completedCount: number; // completed count within the requested window
   consistencyPct: number; // 0-100
 }
 
@@ -27,7 +27,7 @@ export async function computeStats(
   cycleStart: Date,
   windowDays = 90,
 ): Promise<TaskStats[]> {
-  const since = format(subDays(new Date(), windowDays), "yyyy-MM-dd");
+  const since = format(subDays(new Date(), windowDays - 1), "yyyy-MM-dd");
   const { data } = await supabase
     .from("completions")
     .select("task_id, date, done")
@@ -36,6 +36,7 @@ export async function computeStats(
   const doneSet = new Set((data ?? []).filter((c) => c.done).map((c) => `${c.task_id}|${c.date}`));
 
   const today = new Date();
+  const cycleStartDay = startOfDay(cycleStart);
   const out: TaskStats[] = [];
 
   for (const ft of routine) {
@@ -49,23 +50,21 @@ export async function computeStats(
     // Walk from today backwards through the window.
     for (let i = 0; i < windowDays; i++) {
       const d = subDays(today, i);
+      if (isBefore(startOfDay(d), cycleStartDay)) break;
       if (!isScheduledOn(ft, d, cycleStart)) continue;
-      scheduledCount++;
       const key = `${ft.task.id}|${format(d, "yyyy-MM-dd")}`;
       const isDone = doneSet.has(key);
+      if (i === 0 && !isDone) continue;
+
+      scheduledCount++;
       if (isDone) {
         completedCount++;
         runStreak++;
         if (!currentBroken) currentStreak = runStreak;
         if (runStreak > longestStreak) longestStreak = runStreak;
       } else {
-        // Today not yet done shouldn't break the streak — only past misses do.
-        if (i === 0) {
-          currentBroken = true; // pause growth, but don't reset
-        } else {
-          currentBroken = true;
-          runStreak = 0;
-        }
+        currentBroken = true;
+        runStreak = 0;
       }
     }
 
@@ -78,7 +77,7 @@ export async function computeStats(
       scheduledCount,
       completedCount,
       consistencyPct:
-        scheduledCount === 0 ? 0 : Math.round((completedCount / scheduledCount) * 100),
+        scheduledCount === 0 ? 100 : Math.round((completedCount / scheduledCount) * 100),
     });
   }
 
