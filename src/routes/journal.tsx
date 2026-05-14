@@ -131,6 +131,10 @@ function JournalPage() {
   const saveStateRef = useRef<SaveState>("idle");
   const attachmentUrlsRef = useRef<Record<string, string>>({});
   const caretScrollFrameRef = useRef<number | null>(null);
+  const restoreEditorFrameRef = useRef<number | null>(null);
+  const restoreEditorTimeoutsRef = useRef<number[]>([]);
+  const lastMeaningfulEditorHtmlRef = useRef("");
+  const blankEditorSaveAllowedRef = useRef(false);
   const [folders, setFolders] = useState<JournalFolderRow[]>([]);
   const [notes, setNotes] = useState<JournalNoteWithAttachments[]>([]);
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
@@ -247,6 +251,11 @@ function JournalPage() {
       if (caretScrollFrameRef.current !== null) {
         window.cancelAnimationFrame(caretScrollFrameRef.current);
       }
+      if (restoreEditorFrameRef.current !== null) {
+        window.cancelAnimationFrame(restoreEditorFrameRef.current);
+      }
+      restoreEditorTimeoutsRef.current.forEach((timeout) => window.clearTimeout(timeout));
+      restoreEditorTimeoutsRef.current = [];
     };
   }, []);
 
@@ -307,12 +316,43 @@ function JournalPage() {
     if (!editor || !note || hasMeaningfulEditorHtml(editor.innerHTML)) return;
 
     const html =
-      draftRef.current.html ||
-      ensureInlineAttachmentEmbeds(note.content_html || "", note.attachments);
+      firstMeaningfulHtml(
+        draftRef.current.html,
+        lastMeaningfulEditorHtmlRef.current,
+        ensureInlineAttachmentEmbeds(note.content_html || "", note.attachments),
+      ) ?? "";
     if (!hasMeaningfulEditorHtml(html)) return;
 
     editor.innerHTML = renderInlineAttachments(html, note.attachments, attachmentUrlsRef.current);
+    lastMeaningfulEditorHtmlRef.current = html;
+    blankEditorSaveAllowedRef.current = false;
   }, []);
+
+  const scheduleEditorRestore = useCallback(() => {
+    restoreEditorFromDraftIfNeeded();
+    if (typeof window === "undefined") return;
+
+    if (restoreEditorFrameRef.current !== null) {
+      window.cancelAnimationFrame(restoreEditorFrameRef.current);
+    }
+    restoreEditorTimeoutsRef.current.forEach((timeout) => window.clearTimeout(timeout));
+    restoreEditorTimeoutsRef.current = [];
+
+    restoreEditorFrameRef.current = window.requestAnimationFrame(() => {
+      restoreEditorFrameRef.current = null;
+      restoreEditorFromDraftIfNeeded();
+    });
+
+    [80, 240].forEach((delay) => {
+      const timeout = window.setTimeout(() => {
+        restoreEditorFromDraftIfNeeded();
+        restoreEditorTimeoutsRef.current = restoreEditorTimeoutsRef.current.filter(
+          (item) => item !== timeout,
+        );
+      }, delay);
+      restoreEditorTimeoutsRef.current.push(timeout);
+    });
+  }, [restoreEditorFromDraftIfNeeded]);
 
   useEffect(() => {
     if (!selectedNote) {
@@ -344,6 +384,8 @@ function JournalPage() {
       setDraftEntryDate(todayISO());
       setDraftEntryTime(new Date().toTimeString().slice(0, 5));
       if (editorRef.current) editorRef.current.innerHTML = "";
+      lastMeaningfulEditorHtmlRef.current = "";
+      blankEditorSaveAllowedRef.current = false;
       saveStateRef.current = "idle";
       setSaveState("idle");
       return;
@@ -363,6 +405,10 @@ function JournalPage() {
       entryTime: normalizeTimeValue(selectedNote.entry_time),
     };
     draftRef.current = nextDraft;
+    lastMeaningfulEditorHtmlRef.current = hasMeaningfulEditorHtml(nextDraft.html)
+      ? nextDraft.html
+      : "";
+    blankEditorSaveAllowedRef.current = false;
     setMetaEditor(null);
     setDraftTitle(nextDraft.title);
     setDraftHtml(nextDraft.html);
@@ -412,8 +458,12 @@ function JournalPage() {
 
   useEffect(() => {
     if (!selectedNote || !editorRef.current) return;
+    if (!hasMeaningfulEditorHtml(editorRef.current.innerHTML)) {
+      scheduleEditorRestore();
+      return;
+    }
     hydrateInlineAttachments(editorRef.current, selectedNote.attachments, attachmentUrls);
-  }, [attachmentUrls, selectedAttachmentKey, selectedNote]);
+  }, [attachmentUrls, scheduleEditorRestore, selectedAttachmentKey, selectedNote]);
 
   const monthDays = useMemo(() => {
     const start = startOfWeek(startOfMonth(calendarMonth));
@@ -470,15 +520,26 @@ function JournalPage() {
     const versionAtStart = draftVersionRef.current;
     const draft = draftRef.current;
     const liveHtml = editorRef.current?.innerHTML ?? "";
+    const currentNote = selectedNoteRef.current?.id === noteId ? selectedNoteRef.current : null;
+    const fallbackHtml =
+      firstMeaningfulHtml(
+        draft.html,
+        lastMeaningfulEditorHtmlRef.current,
+        ensureInlineAttachmentEmbeds(
+          currentNote?.content_html || "",
+          currentNote?.attachments ?? [],
+        ),
+      ) ?? "";
     const sourceHtml =
-      hasMeaningfulEditorHtml(liveHtml) || !hasMeaningfulEditorHtml(draft.html)
+      hasMeaningfulEditorHtml(liveHtml) ||
+      blankEditorSaveAllowedRef.current ||
+      !hasMeaningfulEditorHtml(fallbackHtml)
         ? liveHtml
-        : draft.html;
+        : fallbackHtml;
     const cleanHtml = serializeEditorHtml(sourceHtml);
     const text = htmlToText(cleanHtml);
     const title = titleFromDraft(draft.title, text);
     const tags = parseTags(draft.tags);
-    const currentNote = selectedNoteRef.current?.id === noteId ? selectedNoteRef.current : null;
     const inlineAttachmentIds = attachmentIdsFromHtml(cleanHtml);
     const removedAttachments =
       currentNote?.attachments.filter((attachment) => !inlineAttachmentIds.has(attachment.id)) ??
@@ -523,6 +584,8 @@ function JournalPage() {
           text,
           tags: tags.join(", "),
         };
+        lastMeaningfulEditorHtmlRef.current = hasMeaningfulEditorHtml(cleanHtml) ? cleanHtml : "";
+        blankEditorSaveAllowedRef.current = false;
         setDraftTitle(title);
         setDraftHtml(cleanHtml);
         setDraftText(text);
@@ -557,7 +620,7 @@ function JournalPage() {
       if (saveStateRef.current === "dirty") void saveDraft();
     };
     const restoreOnReturn = () => {
-      window.setTimeout(restoreEditorFromDraftIfNeeded, 0);
+      scheduleEditorRestore();
     };
     const handleVisibilityChange = () => {
       if (document.visibilityState === "hidden") {
@@ -578,7 +641,7 @@ function JournalPage() {
       window.removeEventListener("pageshow", restoreOnReturn);
       window.removeEventListener("pagehide", saveIfDirty);
     };
-  }, [restoreEditorFromDraftIfNeeded, saveDraft, selectedNoteId]);
+  }, [saveDraft, scheduleEditorRestore, selectedNoteId]);
 
   const markDirty = () => {
     draftVersionRef.current += 1;
@@ -673,8 +736,30 @@ function JournalPage() {
     }
     const html = editorRef.current?.innerHTML ?? "";
     const cleanHtml = serializeEditorHtml(html);
+    const previousMeaningfulHtml = firstMeaningfulHtml(
+      draftRef.current.html,
+      lastMeaningfulEditorHtmlRef.current,
+      selectedNoteRef.current?.content_html ?? "",
+    );
+    const unexpectedBlankEditor =
+      !!previousMeaningfulHtml &&
+      !hasMeaningfulEditorHtml(cleanHtml) &&
+      typeof document !== "undefined" &&
+      (document.visibilityState !== "visible" || !isEditorFocused(editorRef.current));
+
+    if (unexpectedBlankEditor) {
+      scheduleEditorRestore();
+      return;
+    }
+
     const text = htmlToText(cleanHtml);
     draftRef.current = { ...draftRef.current, html: cleanHtml, text };
+    if (hasMeaningfulEditorHtml(cleanHtml)) {
+      lastMeaningfulEditorHtmlRef.current = cleanHtml;
+      blankEditorSaveAllowedRef.current = false;
+    } else if (previousMeaningfulHtml && isEditorFocused(editorRef.current)) {
+      blankEditorSaveAllowedRef.current = true;
+    }
     setDraftHtml(cleanHtml);
     setDraftText(text);
     refreshToolbarState();
@@ -1171,6 +1256,7 @@ function JournalPage() {
                   }}
                   onMouseUp={refreshToolbarState}
                   onFocus={() => {
+                    scheduleEditorRestore();
                     refreshToolbarState();
                     keepCaretInView();
                   }}
@@ -2100,6 +2186,16 @@ function hasMeaningfulEditorHtml(html: string) {
     return true;
   }
   return (template.content.textContent ?? "").replace(/\u00a0/g, " ").trim().length > 0;
+}
+
+function firstMeaningfulHtml(...candidates: string[]) {
+  return candidates.find((html) => hasMeaningfulEditorHtml(html));
+}
+
+function isEditorFocused(editor: HTMLElement | null) {
+  if (!editor || typeof document === "undefined") return false;
+  const activeElement = document.activeElement;
+  return activeElement === editor || (!!activeElement && editor.contains(activeElement));
 }
 
 function htmlToText(html: string) {
