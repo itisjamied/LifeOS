@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/integrations/supabase/client";
@@ -28,7 +28,7 @@ import { toast } from "sonner";
 export const Route = createFileRoute("/manage")({
   head: () => ({
     meta: [
-      { title: "Manage routines — Cycle" },
+      { title: "Edit routine — Cycle" },
       { name: "description", content: "Edit your tasks, variants, sub-steps and 28-day schedule." },
     ],
   }),
@@ -170,15 +170,25 @@ function ManagePage() {
 
   return (
     <div className="px-5 pt-10 animate-fade-up">
-      <header className="mb-7 flex items-start justify-between">
-        <div>
-          <p className="text-xs font-medium uppercase text-muted-foreground">Edit</p>
-          <h1 className="mt-1 text-4xl text-foreground">Manage</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {reordering ? "Move tasks, then save." : "Tap a task to edit."}
-          </p>
+      <header className="mb-7">
+        <div className="grid grid-cols-[auto_1fr_auto] items-start gap-3">
+          <Link
+            to="/"
+            className="icon-button mt-1"
+            aria-label="Back to Today"
+            title="Back to Today"
+          >
+            <ChevronLeft className="h-[18px] w-[18px]" />
+          </Link>
+          <div className="min-w-0 text-center">
+            <p className="text-xs font-medium uppercase text-muted-foreground">Routine</p>
+            <h1 className="mt-1 text-3xl text-foreground">Edit routine</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {reordering ? "Move tasks, then save." : "Tap a task to edit."}
+            </p>
+          </div>
+          <ThemeToggle />
         </div>
-        <ThemeToggle />
       </header>
 
       {/* Filter + reorder controls */}

@@ -48,7 +48,6 @@ import {
   AlignRight,
   ArrowUpDown,
   Bold,
-  BookOpen,
   CalendarDays,
   Check,
   CheckSquare,
@@ -173,6 +172,9 @@ function JournalPage() {
   const editorRef = useRef<HTMLDivElement>(null);
   const editorScrollRef = useRef<HTMLDivElement>(null);
   const editorToolbarRef = useRef<HTMLDivElement>(null);
+  const folderNameInputRef = useRef<HTMLInputElement>(null);
+  const pageTitleInputRef = useRef<HTMLInputElement>(null);
+  const pageHeadingInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const attachmentInputRef = useRef<HTMLInputElement>(null);
   const selectedNoteIdRef = useRef<string | null>(null);
@@ -206,6 +208,9 @@ function JournalPage() {
   const [selectedNoteIds, setSelectedNoteIds] = useState<string[]>([]);
   const [bulkMoveOpen, setBulkMoveOpen] = useState(false);
   const [activeFolderId, setActiveFolderId] = useState<FolderFilter>("all");
+  const [editingFolderName, setEditingFolderName] = useState(false);
+  const [folderNameDraft, setFolderNameDraft] = useState("");
+  const [mobileFolderStack, setMobileFolderStack] = useState(false);
   const [dayModalDate, setDayModalDate] = useState<string | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -222,6 +227,8 @@ function JournalPage() {
   const [draftFolderId, setDraftFolderId] = useState("none");
   const [draftEntryDate, setDraftEntryDate] = useState(todayISO());
   const [draftEntryTime, setDraftEntryTime] = useState(new Date().toTimeString().slice(0, 5));
+  const [editingPageTitle, setEditingPageTitle] = useState(false);
+  const [pageTitleDraft, setPageTitleDraft] = useState("");
   const [pagePickerOpen, setPagePickerOpen] = useState(false);
   const [pageReorderMode, setPageReorderMode] = useState(false);
   const [noteSettingsOpen, setNoteSettingsOpen] = useState(false);
@@ -265,11 +272,33 @@ function JournalPage() {
     setSelectedNoteIds((current) => current.filter((id) => validIds.has(id)));
   }, [notes]);
 
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const media = window.matchMedia("(max-width: 767px)");
+    const syncLayout = () => setMobileFolderStack(media.matches);
+    syncLayout();
+    media.addEventListener("change", syncLayout);
+    return () => media.removeEventListener("change", syncLayout);
+  }, []);
+
   const folderNameById = useMemo(() => {
     const map = new Map<string, string>();
     folders.forEach((folder) => map.set(folder.id, folder.name));
     return map;
   }, [folders]);
+
+  useEffect(() => {
+    setEditingFolderName(false);
+    setFolderNameDraft(
+      isSystemFolder(activeFolderId) ? "" : (folderNameById.get(activeFolderId) ?? ""),
+    );
+  }, [activeFolderId, folderNameById]);
+
+  useEffect(() => {
+    if (!editingFolderName) return;
+    folderNameInputRef.current?.focus();
+    folderNameInputRef.current?.select();
+  }, [editingFolderName]);
 
   const selectedNote = useMemo(
     () => notes.find((note) => note.id === selectedNoteId) ?? null,
@@ -291,6 +320,17 @@ function JournalPage() {
     selectedPageRef.current = selectedPage;
     selectedPageIdRef.current = selectedPage?.id ?? null;
   }, [selectedPage]);
+
+  useEffect(() => {
+    setEditingPageTitle(false);
+    setPageTitleDraft(selectedPage?.title ?? "");
+  }, [selectedPage?.id, selectedPage?.title]);
+
+  useEffect(() => {
+    if (!editingPageTitle) return;
+    pageTitleInputRef.current?.focus();
+    pageTitleInputRef.current?.select();
+  }, [editingPageTitle]);
 
   useEffect(() => {
     if (!selectedNote) {
@@ -516,6 +556,17 @@ function JournalPage() {
     });
   }, [restoreEditorFromDraftIfNeeded]);
 
+  const focusEditorBody = useCallback(() => {
+    const editor = editorRef.current;
+    if (!editor || typeof window === "undefined") return;
+    ensureEditableBreaksAfterBlocks(editor);
+    editor.focus();
+    placeCaretAtStart(editor);
+    saveEditorSelection();
+    refreshToolbarState();
+    keepCaretInView();
+  }, [keepCaretInView, refreshToolbarState, saveEditorSelection]);
+
   useEffect(() => {
     if (!selectedNote) {
       setToolbarState(EMPTY_TOOLBAR_STATE);
@@ -662,6 +713,12 @@ function JournalPage() {
       return true;
     });
   }, [activeFolderId, notes]);
+
+  const unfiledNotes = useMemo(() => notes.filter((note) => !note.folder_id), [notes]);
+  const visibleNotes = useMemo(
+    () => (mobileFolderStack && activeFolderId === "all" ? unfiledNotes : folderNotes),
+    [activeFolderId, folderNotes, mobileFolderStack, unfiledNotes],
+  );
 
   const searchResults = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -959,6 +1016,39 @@ function JournalPage() {
     });
   };
 
+  const savePageTitleDraft = async () => {
+    if (!selectedPage) return;
+    const title = pageTitleDraft.trim();
+    if (!title) {
+      setPageTitleDraft(selectedPage.title);
+      setEditingPageTitle(false);
+      return;
+    }
+
+    setEditingPageTitle(false);
+    if (title === selectedPage.title) return;
+
+    if (saveStateRef.current === "dirty") await saveDraft();
+    try {
+      const saved = await updateJournalNotePage(selectedPage.id, { title });
+      setNotes((current) =>
+        current.map((note) =>
+          note.id === saved.note_id
+            ? {
+                ...note,
+                pages: sortJournalPages(
+                  note.pages.map((item) => (item.id === saved.id ? saved : item)),
+                ),
+              }
+            : note,
+        ),
+      );
+    } catch (e: unknown) {
+      setPageTitleDraft(selectedPage.title);
+      toast.error(e instanceof Error ? e.message : "Couldn't rename page");
+    }
+  };
+
   const removePage = async (page: JournalNotePageRow) => {
     if (!selectedNote || selectedNote.pages.length <= 1) {
       toast.error("Keep at least one page in a note");
@@ -1063,7 +1153,7 @@ function JournalPage() {
   };
 
   const selectAllVisibleNotes = () => {
-    const visibleIds = folderNotes.map((note) => note.id);
+    const visibleIds = visibleNotes.map((note) => note.id);
     setSelectedNoteIds((current) =>
       visibleIds.every((id) => current.includes(id))
         ? current.filter((id) => !visibleIds.includes(id))
@@ -1157,6 +1247,30 @@ function JournalPage() {
         }
       },
     });
+  };
+
+  const saveFolderNameDraft = async () => {
+    if (isSystemFolder(activeFolderId)) return;
+    const currentName = folderNameById.get(activeFolderId) ?? "";
+    const name = folderNameDraft.trim();
+    if (!name) {
+      setFolderNameDraft(currentName);
+      setEditingFolderName(false);
+      return;
+    }
+
+    setEditingFolderName(false);
+    if (name === currentName) return;
+
+    try {
+      const saved = await renameJournalFolder(activeFolderId, name);
+      setFolders((current) =>
+        current.map((item) => (item.id === saved.id ? saved : item)).sort(sortFolders),
+      );
+    } catch (e: unknown) {
+      setFolderNameDraft(currentName);
+      toast.error(e instanceof Error ? e.message : "Couldn't rename folder");
+    }
   };
 
   const removeFolder = async (folder: JournalFolderRow) => {
@@ -1492,7 +1606,7 @@ function JournalPage() {
 
   const selectedFolderLabel =
     activeFolderId === "all"
-      ? "All Notes"
+      ? "Journal"
       : activeFolderId === "unfiled"
         ? "Unfiled"
         : (folderNameById.get(activeFolderId) ?? "Folder");
@@ -1504,7 +1618,7 @@ function JournalPage() {
   const canGoNextPage = selectedNote
     ? selectedPageIndex >= 0 && selectedPageIndex < selectedNote.pages.length - 1
     : false;
-  const visibleNoteIds = folderNotes.map((note) => note.id);
+  const visibleNoteIds = visibleNotes.map((note) => note.id);
   const allVisibleSelected =
     visibleNoteIds.length > 0 && visibleNoteIds.every((id) => selectedNoteIds.includes(id));
   const monthlyPageCount = notes.reduce(
@@ -1593,9 +1707,60 @@ function JournalPage() {
 
       <section className="pt-3 pb-10">
         <div className="mb-4 flex items-center justify-between gap-3">
-          <div>
-            <p className="text-xs font-bold uppercase text-muted-foreground">Folders</p>
-            <h2 className="text-2xl font-bold text-foreground">{selectedFolderLabel}</h2>
+          <div className="flex min-w-0 items-center gap-3">
+            {!isSystemFolder(activeFolderId) && (
+              <button
+                type="button"
+                onClick={() => setActiveFolderId("all")}
+                className="icon-button h-9 w-9 shrink-0"
+                aria-label="Back to journal folders"
+                title="Back to journal folders"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+            )}
+            <div className="min-w-0">
+              <p className="text-xs font-bold uppercase text-muted-foreground">Folders</p>
+              {editingFolderName && !isSystemFolder(activeFolderId) ? (
+                <input
+                  ref={folderNameInputRef}
+                  value={folderNameDraft}
+                  onChange={(event) => setFolderNameDraft(event.target.value)}
+                  onBlur={() => {
+                    void saveFolderNameDraft();
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      event.currentTarget.blur();
+                    }
+                    if (event.key === "Escape") {
+                      event.preventDefault();
+                      setFolderNameDraft(folderNameById.get(activeFolderId) ?? "");
+                      setEditingFolderName(false);
+                    }
+                  }}
+                  className="min-w-0 max-w-full rounded-md bg-muted/70 px-2 py-1 text-2xl font-bold text-foreground outline-none ring-1 ring-ring"
+                  aria-label="Folder name"
+                />
+              ) : !isSystemFolder(activeFolderId) ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFolderNameDraft(selectedFolderLabel);
+                    setEditingFolderName(true);
+                  }}
+                  className="block min-w-0 max-w-full truncate rounded-md text-left text-2xl font-bold text-foreground transition-colors hover:bg-muted"
+                  title="Edit folder name"
+                >
+                  {selectedFolderLabel}
+                </button>
+              ) : (
+                <h2 className="truncate text-2xl font-bold text-foreground">
+                  {selectedFolderLabel}
+                </h2>
+              )}
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -1630,34 +1795,30 @@ function JournalPage() {
           </div>
         </div>
 
-        <div className="mb-5 flex gap-2 overflow-x-auto pb-1">
-          <FolderRow
-            active={activeFolderId === "all"}
-            icon={<BookOpen className="h-4 w-4" />}
-            label="All Notes"
-            count={notes.length}
-            onClick={() => setActiveFolderId("all")}
-          />
-          <FolderRow
-            active={activeFolderId === "unfiled"}
-            icon={<FileText className="h-4 w-4" />}
-            label="Unfiled"
-            count={notes.filter((note) => !note.folder_id).length}
-            onClick={() => setActiveFolderId("unfiled")}
-          />
-          {folders.map((folder) => (
-            <FolderRow
-              key={folder.id}
-              active={activeFolderId === folder.id}
-              icon={<Folder className="h-4 w-4" />}
-              label={folder.name}
-              count={notes.filter((note) => note.folder_id === folder.id).length}
-              onClick={() => setActiveFolderId(folder.id)}
-              onRename={() => renameFolder(folder)}
-              onDelete={() => removeFolder(folder)}
-            />
-          ))}
-        </div>
+        {folders.length > 0 && (
+          <div className="mb-5 grid gap-2 border-b border-border/70 pb-5 md:flex md:gap-2 md:overflow-x-auto md:border-b-0 md:pb-1">
+            {folders.map((folder) => (
+              <FolderRow
+                key={folder.id}
+                active={activeFolderId === folder.id}
+                icon={<Folder className="h-4 w-4" />}
+                label={folder.name}
+                count={notes.filter((note) => note.folder_id === folder.id).length}
+                onClick={() => setActiveFolderId(folder.id)}
+                onRename={() => renameFolder(folder)}
+                onDelete={() => removeFolder(folder)}
+              />
+            ))}
+          </div>
+        )}
+
+        {mobileFolderStack && activeFolderId === "all" && (
+          <div className="mb-3 flex items-center gap-2 text-[10px] font-bold uppercase text-muted-foreground">
+            <span className="h-px flex-1 bg-border" />
+            <span>Unfiled notes</span>
+            <span className="h-px flex-1 bg-border" />
+          </div>
+        )}
 
         {bulkMode && (
           <div className="relative mb-4 rounded-lg border border-border bg-card/60 p-3">
@@ -1706,7 +1867,7 @@ function JournalPage() {
         )}
 
         <NoteList
-          notes={folderNotes}
+          notes={visibleNotes}
           selectedNoteId={selectedNoteId}
           selectionMode={bulkMode}
           selectedNoteIds={selectedNoteIds}
@@ -1854,7 +2015,41 @@ function JournalPage() {
                   <div className="min-w-0">
                     {selectedPage && (
                       <div className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-medium text-muted-foreground">
-                        <span className="truncate">{selectedPage.title}</span>
+                        {editingPageTitle ? (
+                          <input
+                            ref={pageTitleInputRef}
+                            value={pageTitleDraft}
+                            onChange={(event) => setPageTitleDraft(event.target.value)}
+                            onBlur={() => {
+                              void savePageTitleDraft();
+                            }}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter") {
+                                event.preventDefault();
+                                event.currentTarget.blur();
+                              }
+                              if (event.key === "Escape") {
+                                event.preventDefault();
+                                setPageTitleDraft(selectedPage.title);
+                                setEditingPageTitle(false);
+                              }
+                            }}
+                            className="min-w-0 max-w-full rounded-md bg-muted/70 px-2 py-1 text-xs font-semibold text-foreground outline-none ring-1 ring-ring"
+                            aria-label="Page title"
+                          />
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPageTitleDraft(selectedPage.title);
+                              setEditingPageTitle(true);
+                            }}
+                            className="min-w-0 max-w-full truncate rounded-md px-1 py-0.5 text-left transition-colors hover:bg-muted hover:text-foreground"
+                            title="Edit page title"
+                          >
+                            {selectedPage.title}
+                          </button>
+                        )}
                         <span aria-hidden>·</span>
                         <span>{formatPageStamp(selectedPage)}</span>
                       </div>
@@ -1863,6 +2058,7 @@ function JournalPage() {
                       Page title
                     </label>
                     <input
+                      ref={pageHeadingInputRef}
                       id="journal-page-heading"
                       value={draftPageHeading}
                       onChange={(event) => {
@@ -1870,6 +2066,11 @@ function JournalPage() {
                         draftRef.current = { ...draftRef.current, pageHeading };
                         setDraftPageHeading(pageHeading);
                         markDirty();
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key !== "Enter") return;
+                        event.preventDefault();
+                        focusEditorBody();
                       }}
                       className="w-full bg-transparent text-2xl font-bold text-foreground outline-none placeholder:text-muted-foreground"
                       placeholder="Entry title"
@@ -2814,7 +3015,7 @@ function FolderRow({
 }) {
   return (
     <div
-      className={`group flex shrink-0 items-center rounded-full border transition-colors ${
+      className={`group flex w-full items-center rounded-lg border transition-colors md:w-auto md:shrink-0 md:rounded-full ${
         active
           ? "border-primary bg-primary text-primary-foreground"
           : "border-border bg-card/65 text-muted-foreground hover:bg-card hover:text-foreground"
@@ -2824,17 +3025,17 @@ function FolderRow({
         type="button"
         onClick={onClick}
         onDoubleClick={onRename}
-        className="flex min-w-0 items-center gap-2 px-3 py-2 text-left text-sm font-medium"
+        className="flex min-w-0 flex-1 items-center gap-3 px-4 py-3 text-left text-sm font-medium md:flex-none md:gap-2 md:px-3 md:py-2"
       >
         <span className="shrink-0">{icon}</span>
-        <span className="max-w-28 truncate">{label}</span>
+        <span className="min-w-0 flex-1 truncate md:max-w-28 md:flex-none">{label}</span>
         <span className="text-xs opacity-70">{count}</span>
       </button>
       {onDelete && (
         <button
           type="button"
           onClick={onDelete}
-          className={`mr-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full opacity-0 transition-opacity group-hover:opacity-100 ${
+          className={`mr-2 flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-opacity md:mr-1 md:h-7 md:w-7 md:opacity-0 md:group-hover:opacity-100 ${
             active ? "hover:bg-white/15" : "hover:bg-background"
           }`}
           aria-label={`Delete ${label}`}
@@ -3002,6 +3203,16 @@ function lastChecklistItemInRun(item: HTMLElement) {
     current = current.nextElementSibling as HTMLElement;
   }
   return current;
+}
+
+function placeCaretAtStart(element: HTMLElement) {
+  const selection = window.getSelection();
+  if (!selection) return;
+  const range = document.createRange();
+  range.selectNodeContents(element);
+  range.collapse(true);
+  selection.removeAllRanges();
+  selection.addRange(range);
 }
 
 function placeCaretAtEnd(element: HTMLElement) {

@@ -10,7 +10,7 @@ import { useEffect } from "react";
 import appCss from "../styles.css?url";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { Toaster } from "@/components/ui/sonner";
-import { BookOpen, ListChecks, Settings, Pencil, Flame } from "lucide-react";
+import { BookOpen, ListChecks, Settings } from "lucide-react";
 
 function NotFoundComponent() {
   return (
@@ -109,8 +109,13 @@ function BottomNav() {
   const { user } = useAuth();
   const path = useRouterState({ select: (s) => s.location.pathname });
   if (!user) return null;
-  const tab = (to: string, icon: React.ReactNode, label: string) => {
-    const active = path === to;
+  const isTodayArea =
+    path === "/" ||
+    path === "/grid" ||
+    path === "/stats" ||
+    path === "/manage" ||
+    path.startsWith("/habit/");
+  const tab = (to: string, icon: React.ReactNode, label: string, active = path === to) => {
     return (
       <Link
         to={to}
@@ -137,10 +142,8 @@ function BottomNav() {
       style={{ bottom: "calc(1rem + env(safe-area-inset-bottom))" }}
     >
       <div className="mx-auto flex max-w-md">
-        {tab("/", <ListChecks className="h-5 w-5" />, "Today")}
+        {tab("/", <ListChecks className="h-5 w-5" />, "Today", isTodayArea)}
         {tab("/journal", <BookOpen className="h-5 w-5" />, "Journal")}
-        {tab("/stats", <Flame className="h-5 w-5" />, "Stats")}
-        {tab("/manage", <Pencil className="h-5 w-5" />, "Edit")}
         {tab("/settings", <Settings className="h-5 w-5" />, "Settings")}
       </div>
     </nav>
