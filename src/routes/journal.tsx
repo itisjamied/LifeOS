@@ -3,20 +3,30 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Input } from "@/components/ui/input";
+import {
+  AppConfirmDialog,
+  AppTextDialog,
+  type AppConfirmDialogConfig,
+  type AppTextDialogConfig,
+} from "@/components/ui/app-dialog";
 import { todayISO } from "@/lib/cycle";
 import {
   addJournalAttachment,
+  createJournalNotePage,
   createJournalFolder,
   createJournalNote,
   deleteJournalAttachment,
   deleteJournalFolder,
   deleteJournalNote,
+  deleteJournalNotePage,
   fetchJournal,
   renameJournalFolder,
   signedAttachmentUrl,
   updateJournalNote,
+  updateJournalNotePage,
   type JournalAttachmentRow,
   type JournalFolderRow,
+  type JournalNotePageRow,
   type JournalNoteWithAttachments,
 } from "@/lib/journal-data";
 import {
@@ -33,28 +43,40 @@ import {
   subMonths,
 } from "date-fns";
 import {
+  AlignCenter,
+  AlignLeft,
+  AlignRight,
+  ArrowUpDown,
   Bold,
   BookOpen,
   CalendarDays,
+  Check,
   CheckSquare,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
   FileText,
   Folder,
   FolderPlus,
   Heading2,
+  Highlighter,
   Image as ImageIcon,
   Italic,
   Link as LinkIcon,
   List,
   ListOrdered,
+  Minus,
   Paperclip,
+  Palette,
   Pencil,
   Plus,
   Quote,
   Search,
+  Settings2,
   Sparkles,
   Trash2,
+  Type,
   Underline,
   UserRound,
   X,
@@ -76,11 +98,14 @@ export const Route = createFileRoute("/journal")({
 
 type FolderFilter = "all" | "unfiled" | string;
 type SaveState = "idle" | "dirty" | "saving" | "saved";
-type MetaEditor = "stamp" | "folder" | null;
+type FormatMenu = "fontSize" | "textColor" | "highlightColor" | null;
 type ToolbarState = {
   bold: boolean;
   italic: boolean;
   underline: boolean;
+  alignLeft: boolean;
+  alignCenter: boolean;
+  alignRight: boolean;
   heading: boolean;
   unorderedList: boolean;
   orderedList: boolean;
@@ -89,6 +114,7 @@ type ToolbarState = {
 };
 type DraftSnapshot = {
   title: string;
+  pageHeading: string;
   html: string;
   text: string;
   tags: string;
@@ -101,12 +127,45 @@ const EMPTY_TOOLBAR_STATE: ToolbarState = {
   bold: false,
   italic: false,
   underline: false,
+  alignLeft: false,
+  alignCenter: false,
+  alignRight: false,
   heading: false,
   unorderedList: false,
   orderedList: false,
   checklist: false,
   quote: false,
 };
+
+const TEXT_COLOR_OPTIONS = [
+  { label: "Ink", value: "#111827" },
+  { label: "Gray", value: "#6b7280" },
+  { label: "Red", value: "#dc2626" },
+  { label: "Orange", value: "#ea580c" },
+  { label: "Yellow", value: "#ca8a04" },
+  { label: "Green", value: "#16a34a" },
+  { label: "Blue", value: "#2563eb" },
+  { label: "Purple", value: "#7c3aed" },
+  { label: "Pink", value: "#db2777" },
+];
+
+const HIGHLIGHT_COLOR_OPTIONS = [
+  { label: "Yellow", value: "#fef08a" },
+  { label: "Orange", value: "#fed7aa" },
+  { label: "Green", value: "#bbf7d0" },
+  { label: "Blue", value: "#bfdbfe" },
+  { label: "Purple", value: "#ddd6fe" },
+  { label: "Pink", value: "#fbcfe8" },
+];
+
+const FONT_SIZE_OPTIONS = [
+  { label: "12", value: "12px" },
+  { label: "14", value: "14px" },
+  { label: "16", value: "16px" },
+  { label: "18", value: "18px" },
+  { label: "24", value: "24px" },
+  { label: "32", value: "32px" },
+];
 
 function JournalPage() {
   const { user, loading } = useAuth();
@@ -118,8 +177,11 @@ function JournalPage() {
   const attachmentInputRef = useRef<HTMLInputElement>(null);
   const selectedNoteIdRef = useRef<string | null>(null);
   const selectedNoteRef = useRef<JournalNoteWithAttachments | null>(null);
+  const selectedPageIdRef = useRef<string | null>(null);
+  const selectedPageRef = useRef<JournalNotePageRow | null>(null);
   const draftRef = useRef<DraftSnapshot>({
     title: "",
+    pageHeading: "",
     html: "",
     text: "",
     tags: "",
@@ -135,9 +197,14 @@ function JournalPage() {
   const restoreEditorTimeoutsRef = useRef<number[]>([]);
   const lastMeaningfulEditorHtmlRef = useRef("");
   const blankEditorSaveAllowedRef = useRef(false);
+  const selectionRangeRef = useRef<Range | null>(null);
   const [folders, setFolders] = useState<JournalFolderRow[]>([]);
   const [notes, setNotes] = useState<JournalNoteWithAttachments[]>([]);
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
+  const [selectedPageId, setSelectedPageId] = useState<string | null>(null);
+  const [bulkMode, setBulkMode] = useState(false);
+  const [selectedNoteIds, setSelectedNoteIds] = useState<string[]>([]);
+  const [bulkMoveOpen, setBulkMoveOpen] = useState(false);
   const [activeFolderId, setActiveFolderId] = useState<FolderFilter>("all");
   const [dayModalDate, setDayModalDate] = useState<string | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -148,15 +215,21 @@ function JournalPage() {
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [attachmentUrls, setAttachmentUrls] = useState<Record<string, string>>({});
   const [draftTitle, setDraftTitle] = useState("");
+  const [draftPageHeading, setDraftPageHeading] = useState("");
   const [draftHtml, setDraftHtml] = useState("");
   const [draftText, setDraftText] = useState("");
   const [draftTags, setDraftTags] = useState("");
   const [draftFolderId, setDraftFolderId] = useState("none");
   const [draftEntryDate, setDraftEntryDate] = useState(todayISO());
   const [draftEntryTime, setDraftEntryTime] = useState(new Date().toTimeString().slice(0, 5));
-  const [metaEditor, setMetaEditor] = useState<MetaEditor>(null);
+  const [pagePickerOpen, setPagePickerOpen] = useState(false);
+  const [pageReorderMode, setPageReorderMode] = useState(false);
+  const [noteSettingsOpen, setNoteSettingsOpen] = useState(false);
+  const [textDialog, setTextDialog] = useState<AppTextDialogConfig | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<AppConfirmDialogConfig | null>(null);
   const [keyboardOffset, setKeyboardOffset] = useState(0);
   const [toolbarState, setToolbarState] = useState<ToolbarState>(EMPTY_TOOLBAR_STATE);
+  const [formatMenu, setFormatMenu] = useState<FormatMenu>(null);
 
   useEffect(() => {
     if (!loading && !user) navigate({ to: "/auth" });
@@ -187,6 +260,11 @@ function JournalPage() {
     selectedNoteIdRef.current = selectedNoteId;
   }, [selectedNoteId]);
 
+  useEffect(() => {
+    const validIds = new Set(notes.map((note) => note.id));
+    setSelectedNoteIds((current) => current.filter((id) => validIds.has(id)));
+  }, [notes]);
+
   const folderNameById = useMemo(() => {
     const map = new Map<string, string>();
     folders.forEach((folder) => map.set(folder.id, folder.name));
@@ -198,9 +276,41 @@ function JournalPage() {
     [notes, selectedNoteId],
   );
 
+  const selectedPage = useMemo(() => {
+    if (!selectedNote) return null;
+    return (
+      selectedNote.pages.find((page) => page.id === selectedPageId) ?? selectedNote.pages[0] ?? null
+    );
+  }, [selectedNote, selectedPageId]);
+
   useEffect(() => {
     selectedNoteRef.current = selectedNote;
   }, [selectedNote]);
+
+  useEffect(() => {
+    selectedPageRef.current = selectedPage;
+    selectedPageIdRef.current = selectedPage?.id ?? null;
+  }, [selectedPage]);
+
+  useEffect(() => {
+    if (!selectedNote) {
+      setSelectedPageId(null);
+      setPagePickerOpen(false);
+      setPageReorderMode(false);
+      setNoteSettingsOpen(false);
+      return;
+    }
+
+    setSelectedPageId((current) =>
+      current && selectedNote.pages.some((page) => page.id === current)
+        ? current
+        : (selectedNote.pages[0]?.id ?? null),
+    );
+  }, [selectedNote]);
+
+  useEffect(() => {
+    setPageReorderMode(false);
+  }, [selectedNote?.id]);
 
   useEffect(() => {
     saveStateRef.current = saveState;
@@ -213,6 +323,7 @@ function JournalPage() {
   useEffect(() => {
     draftRef.current = {
       title: draftTitle,
+      pageHeading: draftPageHeading,
       html: draftHtml,
       text: draftText,
       tags: draftTags,
@@ -220,7 +331,16 @@ function JournalPage() {
       entryDate: draftEntryDate,
       entryTime: draftEntryTime,
     };
-  }, [draftEntryDate, draftEntryTime, draftFolderId, draftHtml, draftTags, draftText, draftTitle]);
+  }, [
+    draftEntryDate,
+    draftEntryTime,
+    draftFolderId,
+    draftHtml,
+    draftPageHeading,
+    draftTags,
+    draftText,
+    draftTitle,
+  ]);
 
   const keepCaretInView = useCallback(() => {
     if (typeof window === "undefined") return;
@@ -284,6 +404,25 @@ function JournalPage() {
     };
   }, [keepCaretInView, selectedNote]);
 
+  const saveEditorSelection = useCallback(() => {
+    if (typeof window === "undefined" || !editorRef.current) return false;
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return false;
+    const range = selection.getRangeAt(0);
+    if (!editorRef.current.contains(range.commonAncestorContainer)) return false;
+    selectionRangeRef.current = range.cloneRange();
+    return true;
+  }, []);
+
+  const restoreEditorSelection = useCallback(() => {
+    if (typeof window === "undefined" || !editorRef.current || !selectionRangeRef.current) return;
+    if (!editorRef.current.contains(selectionRangeRef.current.commonAncestorContainer)) return;
+    const selection = window.getSelection();
+    if (!selection) return;
+    selection.removeAllRanges();
+    selection.addRange(selectionRangeRef.current);
+  }, []);
+
   const refreshToolbarState = useCallback(() => {
     if (typeof document === "undefined" || !editorRef.current) return;
     const selection = window.getSelection();
@@ -294,32 +433,55 @@ function JournalPage() {
 
     const anchor = selection.anchorNode;
     if (anchor && !editorRef.current.contains(anchor)) return;
+    saveEditorSelection();
 
     const formatBlock = String(document.queryCommandValue("formatBlock") ?? "").toLowerCase();
     const blockElement = currentBlockElement(editorRef.current);
+    const alignCenter = document.queryCommandState("justifyCenter");
+    const alignRight = document.queryCommandState("justifyRight");
+    const alignLeft = document.queryCommandState("justifyLeft") || (!alignCenter && !alignRight);
 
     setToolbarState({
       bold: document.queryCommandState("bold"),
       italic: document.queryCommandState("italic"),
       underline: document.queryCommandState("underline"),
+      alignLeft,
+      alignCenter,
+      alignRight,
       heading: formatBlock === "h2" || blockElement?.tagName === "H2",
       unorderedList: document.queryCommandState("insertUnorderedList"),
       orderedList: document.queryCommandState("insertOrderedList"),
       checklist: !!blockElement?.closest("[data-checklist-item]"),
       quote: formatBlock === "blockquote" || !!blockElement?.closest("blockquote"),
     });
-  }, []);
+  }, [saveEditorSelection]);
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+
+    const handleSelectionChange = () => {
+      const editor = editorRef.current;
+      const selection = window.getSelection();
+      const anchor = selection?.anchorNode;
+      if (!editor || !anchor || !editor.contains(anchor)) return;
+      refreshToolbarState();
+    };
+
+    document.addEventListener("selectionchange", handleSelectionChange);
+    return () => document.removeEventListener("selectionchange", handleSelectionChange);
+  }, [refreshToolbarState]);
 
   const restoreEditorFromDraftIfNeeded = useCallback(() => {
     const editor = editorRef.current;
     const note = selectedNoteRef.current;
-    if (!editor || !note || hasMeaningfulEditorHtml(editor.innerHTML)) return;
+    const page = selectedPageRef.current;
+    if (!editor || !note || !page || hasMeaningfulEditorHtml(editor.innerHTML)) return;
 
     const html =
       firstMeaningfulHtml(
         draftRef.current.html,
         lastMeaningfulEditorHtmlRef.current,
-        ensureInlineAttachmentEmbeds(note.content_html || "", note.attachments),
+        ensureInlineAttachmentEmbeds(page.content_html || "", note.attachments),
       ) ?? "";
     if (!hasMeaningfulEditorHtml(html)) return;
 
@@ -365,9 +527,10 @@ function JournalPage() {
   }, [refreshToolbarState, selectedNote]);
 
   useEffect(() => {
-    if (!selectedNote) {
+    if (!selectedNote || !selectedPage) {
       draftRef.current = {
         title: "",
+        pageHeading: "",
         html: "",
         text: "",
         tags: "",
@@ -375,8 +538,8 @@ function JournalPage() {
         entryDate: todayISO(),
         entryTime: new Date().toTimeString().slice(0, 5),
       };
-      setMetaEditor(null);
       setDraftTitle("");
+      setDraftPageHeading("");
       setDraftHtml("");
       setDraftText("");
       setDraftTags("");
@@ -392,25 +555,26 @@ function JournalPage() {
     }
 
     const html = ensureInlineAttachmentEmbeds(
-      selectedNote.content_html || "",
+      selectedPage.content_html || "",
       selectedNote.attachments,
     );
     const nextDraft = {
       title: selectedNote.title,
+      pageHeading: selectedPage.heading ?? "",
       html,
-      text: selectedNote.content_text,
+      text: selectedPage.content_text,
       tags: (selectedNote.tags ?? []).join(", "),
       folderId: selectedNote.folder_id ?? "none",
-      entryDate: selectedNote.entry_date,
-      entryTime: normalizeTimeValue(selectedNote.entry_time),
+      entryDate: selectedPage.entry_date ?? selectedNote.entry_date,
+      entryTime: normalizeTimeValue(selectedPage.entry_time ?? selectedNote.entry_time),
     };
     draftRef.current = nextDraft;
     lastMeaningfulEditorHtmlRef.current = hasMeaningfulEditorHtml(nextDraft.html)
       ? nextDraft.html
       : "";
     blankEditorSaveAllowedRef.current = false;
-    setMetaEditor(null);
     setDraftTitle(nextDraft.title);
+    setDraftPageHeading(nextDraft.pageHeading);
     setDraftHtml(nextDraft.html);
     setDraftText(nextDraft.text);
     setDraftTags(nextDraft.tags);
@@ -422,10 +586,10 @@ function JournalPage() {
     }
     saveStateRef.current = "idle";
     setSaveState("idle");
-    // Only reset the draft when the user switches notes. Autosave updates the
-    // selected note row too, and resetting on every save would move the cursor.
+    // Only reset the draft when the user switches notes/pages. Autosave updates
+    // the selected rows too, and resetting on every save would move the cursor.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedNote?.id]);
+  }, [selectedNote?.id, selectedPage?.id]);
 
   const selectedAttachmentKey = selectedNote?.attachments
     .map((attachment) => attachment.id)
@@ -457,13 +621,13 @@ function JournalPage() {
   }, [selectedNote?.id, selectedNote?.attachments, selectedAttachmentKey]);
 
   useEffect(() => {
-    if (!selectedNote || !editorRef.current) return;
+    if (!selectedNote || !selectedPage || !editorRef.current) return;
     if (!hasMeaningfulEditorHtml(editorRef.current.innerHTML)) {
       scheduleEditorRestore();
       return;
     }
     hydrateInlineAttachments(editorRef.current, selectedNote.attachments, attachmentUrls);
-  }, [attachmentUrls, scheduleEditorRestore, selectedAttachmentKey, selectedNote]);
+  }, [attachmentUrls, scheduleEditorRestore, selectedAttachmentKey, selectedNote, selectedPage]);
 
   const monthDays = useMemo(() => {
     const start = startOfWeek(startOfMonth(calendarMonth));
@@ -477,7 +641,17 @@ function JournalPage() {
 
   const notesByDate = useMemo(() => {
     const counts = new Map<string, number>();
-    notes.forEach((note) => counts.set(note.entry_date, (counts.get(note.entry_date) ?? 0) + 1));
+    notes.forEach((note) => {
+      const pages = note.pages.length ? note.pages : [];
+      if (!pages.length) {
+        counts.set(note.entry_date, (counts.get(note.entry_date) ?? 0) + 1);
+        return;
+      }
+      pages.forEach((page) => {
+        const entryDate = page.entry_date ?? note.entry_date;
+        counts.set(entryDate, (counts.get(entryDate) ?? 0) + 1);
+      });
+    });
     return counts;
   }, [notes]);
 
@@ -500,6 +674,13 @@ function JournalPage() {
         note.entry_date,
         normalizeTimeValue(note.entry_time),
         folderName,
+        ...note.pages.flatMap((page) => [
+          page.title,
+          page.heading,
+          page.content_text,
+          page.entry_date,
+          normalizeTimeValue(page.entry_time),
+        ]),
         ...note.attachments.map((attachment) => attachment.file_name),
       ]
         .join(" ")
@@ -509,24 +690,33 @@ function JournalPage() {
   }, [folderNameById, notes, query]);
 
   const dayModalNotes = useMemo(
-    () => (dayModalDate ? notes.filter((note) => note.entry_date === dayModalDate) : []),
+    () =>
+      dayModalDate
+        ? notes.filter((note) =>
+            note.pages.length
+              ? note.pages.some((page) => (page.entry_date ?? note.entry_date) === dayModalDate)
+              : note.entry_date === dayModalDate,
+          )
+        : [],
     [dayModalDate, notes],
   );
 
   const saveDraft = useCallback(async () => {
     const noteId = selectedNoteIdRef.current;
-    if (!noteId) return;
+    const pageId = selectedPageIdRef.current;
+    if (!noteId || !pageId) return;
 
     const versionAtStart = draftVersionRef.current;
     const draft = draftRef.current;
     const liveHtml = editorRef.current?.innerHTML ?? "";
     const currentNote = selectedNoteRef.current?.id === noteId ? selectedNoteRef.current : null;
+    const currentPage = selectedPageRef.current?.id === pageId ? selectedPageRef.current : null;
     const fallbackHtml =
       firstMeaningfulHtml(
         draft.html,
         lastMeaningfulEditorHtmlRef.current,
         ensureInlineAttachmentEmbeds(
-          currentNote?.content_html || "",
+          currentPage?.content_html || "",
           currentNote?.attachments ?? [],
         ),
       ) ?? "";
@@ -538,25 +728,36 @@ function JournalPage() {
         : fallbackHtml;
     const cleanHtml = serializeEditorHtml(sourceHtml);
     const text = htmlToText(cleanHtml);
-    const title = titleFromDraft(draft.title, text);
+    const pageHeading = draft.pageHeading.trim().slice(0, 160);
+    const title = titleFromDraft(draft.title, pageHeading || text);
     const tags = parseTags(draft.tags);
-    const inlineAttachmentIds = attachmentIdsFromHtml(cleanHtml);
+    const inlineAttachmentIds = attachmentIdsFromPages(currentNote?.pages ?? [], pageId, cleanHtml);
     const removedAttachments =
       currentNote?.attachments.filter((attachment) => !inlineAttachmentIds.has(attachment.id)) ??
       [];
     const removedAttachmentIds = new Set(removedAttachments.map((attachment) => attachment.id));
+    const noteContentText = noteTextFromPages(currentNote?.pages ?? [], pageId, text, pageHeading);
+    const noteContentHtml =
+      currentNote?.pages[0]?.id === pageId ? cleanHtml : (currentNote?.content_html ?? cleanHtml);
     saveStateRef.current = "saving";
     setSaveState("saving");
     try {
-      const saved = await updateJournalNote(noteId, {
-        title,
-        content_html: cleanHtml,
-        content_text: text,
-        tags,
-        folder_id: draft.folderId === "none" ? null : draft.folderId,
-        entry_date: draft.entryDate || todayISO(),
-        entry_time: draft.entryTime || new Date().toTimeString().slice(0, 5),
-      });
+      const [saved, savedPage] = await Promise.all([
+        updateJournalNote(noteId, {
+          title,
+          content_html: noteContentHtml,
+          content_text: noteContentText,
+          tags,
+          folder_id: draft.folderId === "none" ? null : draft.folderId,
+        }),
+        updateJournalNotePage(pageId, {
+          heading: pageHeading,
+          content_html: cleanHtml,
+          content_text: text,
+          entry_date: draft.entryDate || todayISO(),
+          entry_time: draft.entryTime || new Date().toTimeString().slice(0, 5),
+        }),
+      ]);
       if (removedAttachments.length) {
         await Promise.all(
           removedAttachments.map((attachment) => deleteJournalAttachment(attachment)),
@@ -571,15 +772,23 @@ function JournalPage() {
                   attachments: note.attachments.filter(
                     (attachment) => !removedAttachmentIds.has(attachment.id),
                   ),
+                  pages: sortJournalPages(
+                    note.pages.map((page) => (page.id === savedPage.id ? savedPage : page)),
+                  ),
                 }
               : note,
           ),
         ),
       );
-      if (selectedNoteIdRef.current === noteId && draftVersionRef.current === versionAtStart) {
+      if (
+        selectedNoteIdRef.current === noteId &&
+        selectedPageIdRef.current === pageId &&
+        draftVersionRef.current === versionAtStart
+      ) {
         draftRef.current = {
           ...draftRef.current,
           title,
+          pageHeading,
           html: cleanHtml,
           text,
           tags: tags.join(", "),
@@ -587,17 +796,18 @@ function JournalPage() {
         lastMeaningfulEditorHtmlRef.current = hasMeaningfulEditorHtml(cleanHtml) ? cleanHtml : "";
         blankEditorSaveAllowedRef.current = false;
         setDraftTitle(title);
+        setDraftPageHeading(pageHeading);
         setDraftHtml(cleanHtml);
         setDraftText(text);
         setDraftTags(tags.join(", "));
         saveStateRef.current = "saved";
         setSaveState("saved");
-      } else if (selectedNoteIdRef.current === noteId) {
+      } else if (selectedNoteIdRef.current === noteId && selectedPageIdRef.current === pageId) {
         saveStateRef.current = "dirty";
         setSaveState("dirty");
       }
     } catch (e: unknown) {
-      if (selectedNoteIdRef.current === noteId) {
+      if (selectedNoteIdRef.current === noteId && selectedPageIdRef.current === pageId) {
         saveStateRef.current = "dirty";
         setSaveState("dirty");
       }
@@ -655,6 +865,12 @@ function JournalPage() {
     setSelectedNoteId(noteId);
   };
 
+  const selectPage = async (pageId: string) => {
+    if (pageId === selectedPageId) return;
+    if (saveStateRef.current === "dirty") await saveDraft();
+    setSelectedPageId(pageId);
+  };
+
   const addNote = async ({
     folderId,
     entryDate,
@@ -667,6 +883,7 @@ function JournalPage() {
       const note = await createJournalNote(user.id, targetFolderId, entryDate ?? todayISO());
       setNotes((current) => sortJournalNotes([note, ...current]));
       setSelectedNoteId(note.id);
+      setSelectedPageId(note.pages[0]?.id ?? null);
       setDayModalDate(null);
       setSearchOpen(false);
     } catch (e: unknown) {
@@ -674,59 +891,318 @@ function JournalPage() {
     }
   };
 
+  const addPage = async () => {
+    if (!user || !selectedNote) return;
+    const noteId = selectedNote.id;
+    const sortOrder = selectedNote.pages.length;
+    const createdAt = new Date();
+    const entryDate = todayISO(createdAt);
+    const entryTime = createdAt.toTimeString().slice(0, 5);
+    setTextDialog({
+      title: "New page",
+      label: "Page name",
+      initialValue: format(createdAt, "MMM d"),
+      confirmLabel: "Add page",
+      onSubmit: async (title) => {
+        if (saveStateRef.current === "dirty") await saveDraft();
+        try {
+          const page = await createJournalNotePage({
+            userId: user.id,
+            noteId,
+            title,
+            sortOrder,
+            entryDate,
+            entryTime,
+          });
+          setNotes((current) =>
+            current.map((note) =>
+              note.id === noteId
+                ? { ...note, pages: sortJournalPages([...note.pages, page]) }
+                : note,
+            ),
+          );
+          setSelectedPageId(page.id);
+          setPagePickerOpen(false);
+        } catch (e: unknown) {
+          toast.error(e instanceof Error ? e.message : "Couldn't add page");
+        }
+      },
+    });
+  };
+
+  const renamePage = async (page: JournalNotePageRow) => {
+    setTextDialog({
+      title: "Rename page",
+      label: "Page name",
+      initialValue: page.title,
+      confirmLabel: "Rename",
+      onSubmit: async (title) => {
+        if (title === page.title) return;
+        try {
+          const saved = await updateJournalNotePage(page.id, { title });
+          setNotes((current) =>
+            current.map((note) =>
+              note.id === saved.note_id
+                ? {
+                    ...note,
+                    pages: sortJournalPages(
+                      note.pages.map((item) => (item.id === saved.id ? saved : item)),
+                    ),
+                  }
+                : note,
+            ),
+          );
+        } catch (e: unknown) {
+          toast.error(e instanceof Error ? e.message : "Couldn't rename page");
+        }
+      },
+    });
+  };
+
+  const removePage = async (page: JournalNotePageRow) => {
+    if (!selectedNote || selectedNote.pages.length <= 1) {
+      toast.error("Keep at least one page in a note");
+      return;
+    }
+    const noteId = selectedNote.id;
+    const pageIndex = selectedNote.pages.findIndex((item) => item.id === page.id);
+    const nextPage = selectedNote.pages[pageIndex + 1] ?? selectedNote.pages[pageIndex - 1];
+    setConfirmDialog({
+      title: "Delete page?",
+      description: `"${page.title}" will be removed from this note.`,
+      confirmLabel: "Delete page",
+      destructive: true,
+      onConfirm: async () => {
+        try {
+          await deleteJournalNotePage(page.id);
+          setNotes((current) =>
+            current.map((note) =>
+              note.id === noteId
+                ? { ...note, pages: note.pages.filter((item) => item.id !== page.id) }
+                : note,
+            ),
+          );
+          if (selectedPageIdRef.current === page.id) {
+            saveStateRef.current = "idle";
+            setSaveState("idle");
+            setSelectedPageId(nextPage?.id ?? null);
+          }
+          setPagePickerOpen(false);
+        } catch (e: unknown) {
+          toast.error(e instanceof Error ? e.message : "Couldn't delete page");
+        }
+      },
+    });
+  };
+
+  const goToAdjacentPage = (direction: -1 | 1) => {
+    if (!selectedNote || !selectedPage) return;
+    const pageIndex = selectedNote.pages.findIndex((page) => page.id === selectedPage.id);
+    const nextPage = selectedNote.pages[pageIndex + direction];
+    if (nextPage) void selectPage(nextPage.id);
+  };
+
+  const movePage = async (pageId: string, direction: -1 | 1) => {
+    const noteId = selectedNote?.id;
+    if (!noteId) return;
+    if (saveStateRef.current === "dirty") await saveDraft();
+
+    const note = selectedNoteRef.current?.id === noteId ? selectedNoteRef.current : selectedNote;
+    if (!note) return;
+
+    const reorderedPages = reorderJournalPages(note.pages, pageId, direction);
+    if (!reorderedPages) return;
+
+    const previousPages = note.pages;
+    setNotes((current) =>
+      current.map((item) => (item.id === noteId ? { ...item, pages: reorderedPages } : item)),
+    );
+
+    try {
+      const savedPages = await Promise.all(
+        reorderedPages.map((page) =>
+          updateJournalNotePage(page.id, { sort_order: page.sort_order }),
+        ),
+      );
+      setNotes((current) =>
+        current.map((item) =>
+          item.id === noteId
+            ? {
+                ...item,
+                pages: sortJournalPages(
+                  item.pages.map(
+                    (page) => savedPages.find((saved) => saved.id === page.id) ?? page,
+                  ),
+                ),
+              }
+            : item,
+        ),
+      );
+    } catch (e: unknown) {
+      setNotes((current) =>
+        current.map((item) => (item.id === noteId ? { ...item, pages: previousPages } : item)),
+      );
+      toast.error(e instanceof Error ? e.message : "Couldn't reorder pages");
+    }
+  };
+
+  const toggleBulkMode = () => {
+    setBulkMode((current) => {
+      if (current) {
+        setSelectedNoteIds([]);
+        setBulkMoveOpen(false);
+      }
+      return !current;
+    });
+  };
+
+  const toggleNoteSelection = (noteId: string) => {
+    setSelectedNoteIds((current) =>
+      current.includes(noteId) ? current.filter((id) => id !== noteId) : [...current, noteId],
+    );
+  };
+
+  const selectAllVisibleNotes = () => {
+    const visibleIds = folderNotes.map((note) => note.id);
+    setSelectedNoteIds((current) =>
+      visibleIds.every((id) => current.includes(id))
+        ? current.filter((id) => !visibleIds.includes(id))
+        : Array.from(new Set([...current, ...visibleIds])),
+    );
+  };
+
+  const moveSelectedNotes = async (folderId: string) => {
+    const ids = selectedNoteIds;
+    if (!ids.length) return;
+    const nextFolderId = folderId === "none" ? null : folderId;
+    try {
+      await Promise.all(
+        ids.map((noteId) => updateJournalNote(noteId, { folder_id: nextFolderId })),
+      );
+      setNotes((current) =>
+        current.map((note) =>
+          ids.includes(note.id) ? { ...note, folder_id: nextFolderId } : note,
+        ),
+      );
+      setSelectedNoteIds([]);
+      setBulkMode(false);
+      setBulkMoveOpen(false);
+      toast.success(ids.length === 1 ? "Note moved" : "Notes moved");
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Couldn't move notes");
+    }
+  };
+
+  const deleteSelectedNotes = () => {
+    const ids = selectedNoteIds;
+    if (!ids.length) return;
+    setConfirmDialog({
+      title: ids.length === 1 ? "Delete note?" : "Delete notes?",
+      description:
+        ids.length === 1
+          ? "This note and all of its pages will be deleted."
+          : `${ids.length} notes and all of their pages will be deleted.`,
+      confirmLabel: ids.length === 1 ? "Delete note" : "Delete notes",
+      destructive: true,
+      onConfirm: async () => {
+        try {
+          await Promise.all(ids.map((noteId) => deleteJournalNote(noteId)));
+          setNotes((current) => current.filter((note) => !ids.includes(note.id)));
+          setSelectedNoteIds([]);
+          setBulkMode(false);
+          setBulkMoveOpen(false);
+          if (selectedNoteId && ids.includes(selectedNoteId)) setSelectedNoteId(null);
+        } catch (e: unknown) {
+          toast.error(e instanceof Error ? e.message : "Couldn't delete notes");
+        }
+      },
+    });
+  };
+
   const addFolder = async () => {
     if (!user) return;
-    const name = prompt("Folder name")?.trim();
-    if (!name) return;
-    try {
-      const folder = await createJournalFolder(user.id, name, folders.length);
-      setFolders((current) => [...current, folder]);
-      setActiveFolderId(folder.id);
-    } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : "Couldn't add folder");
-    }
+    const sortOrder = folders.length;
+    setTextDialog({
+      title: "New folder",
+      label: "Folder name",
+      placeholder: "Folder name",
+      confirmLabel: "Add folder",
+      onSubmit: async (name) => {
+        try {
+          const folder = await createJournalFolder(user.id, name, sortOrder);
+          setFolders((current) => [...current, folder]);
+          setActiveFolderId(folder.id);
+        } catch (e: unknown) {
+          toast.error(e instanceof Error ? e.message : "Couldn't add folder");
+        }
+      },
+    });
   };
 
   const renameFolder = async (folder: JournalFolderRow) => {
-    const name = prompt("Rename folder", folder.name)?.trim();
-    if (!name || name === folder.name) return;
-    try {
-      const saved = await renameJournalFolder(folder.id, name);
-      setFolders((current) =>
-        current.map((item) => (item.id === saved.id ? saved : item)).sort(sortFolders),
-      );
-    } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : "Couldn't rename folder");
-    }
+    setTextDialog({
+      title: "Rename folder",
+      label: "Folder name",
+      initialValue: folder.name,
+      confirmLabel: "Rename",
+      onSubmit: async (name) => {
+        if (name === folder.name) return;
+        try {
+          const saved = await renameJournalFolder(folder.id, name);
+          setFolders((current) =>
+            current.map((item) => (item.id === saved.id ? saved : item)).sort(sortFolders),
+          );
+        } catch (e: unknown) {
+          toast.error(e instanceof Error ? e.message : "Couldn't rename folder");
+        }
+      },
+    });
   };
 
   const removeFolder = async (folder: JournalFolderRow) => {
-    if (!confirm(`Delete "${folder.name}"? Notes in it will move to Unfiled.`)) return;
-    try {
-      await deleteJournalFolder(folder.id);
-      setFolders((current) => current.filter((item) => item.id !== folder.id));
-      setNotes((current) =>
-        current.map((note) => (note.folder_id === folder.id ? { ...note, folder_id: null } : note)),
-      );
-      if (activeFolderId === folder.id) setActiveFolderId("all");
-    } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : "Couldn't delete folder");
-    }
+    setConfirmDialog({
+      title: "Delete folder?",
+      description: `"${folder.name}" will be deleted. Notes in it will move to Unfiled.`,
+      confirmLabel: "Delete folder",
+      destructive: true,
+      onConfirm: async () => {
+        try {
+          await deleteJournalFolder(folder.id);
+          setFolders((current) => current.filter((item) => item.id !== folder.id));
+          setNotes((current) =>
+            current.map((note) =>
+              note.folder_id === folder.id ? { ...note, folder_id: null } : note,
+            ),
+          );
+          if (activeFolderId === folder.id) setActiveFolderId("all");
+        } catch (e: unknown) {
+          toast.error(e instanceof Error ? e.message : "Couldn't delete folder");
+        }
+      },
+    });
   };
 
   const removeSelectedNote = async () => {
     if (!selectedNote) return;
-    if (!confirm(`Delete "${selectedNote.title}"?`)) return;
-    try {
-      await deleteJournalNote(selectedNote.id);
-      setNotes((current) => {
-        const next = current.filter((note) => note.id !== selectedNote.id);
-        setSelectedNoteId(next[0]?.id ?? null);
-        return next;
-      });
-    } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : "Couldn't delete note");
-    }
+    const note = selectedNote;
+    setConfirmDialog({
+      title: "Delete note?",
+      description: `"${note.title}" and all of its pages will be deleted.`,
+      confirmLabel: "Delete note",
+      destructive: true,
+      onConfirm: async () => {
+        try {
+          await deleteJournalNote(note.id);
+          setNotes((current) => {
+            const next = current.filter((item) => item.id !== note.id);
+            setSelectedNoteId(next[0]?.id ?? null);
+            return next;
+          });
+        } catch (e: unknown) {
+          toast.error(e instanceof Error ? e.message : "Couldn't delete note");
+        }
+      },
+    });
   };
 
   const handleEditorInput = () => {
@@ -739,7 +1215,7 @@ function JournalPage() {
     const previousMeaningfulHtml = firstMeaningfulHtml(
       draftRef.current.html,
       lastMeaningfulEditorHtmlRef.current,
-      selectedNoteRef.current?.content_html ?? "",
+      selectedPageRef.current?.content_html ?? "",
     );
     const unexpectedBlankEditor =
       !!previousMeaningfulHtml &&
@@ -769,14 +1245,73 @@ function JournalPage() {
 
   const runCommand = (command: string, value?: string, trailingBreak = false) => {
     editorRef.current?.focus();
+    restoreEditorSelection();
     document.execCommand(command, false, value);
     if (trailingBreak) ensureEditableBreaksAfterBlocks(editorRef.current);
     handleEditorInput();
     window.setTimeout(refreshToolbarState, 0);
   };
 
+  const applyTextColor = (color: string) => {
+    setFormatMenu(null);
+    runCommand("foreColor", color);
+  };
+
+  const applyHighlightColor = (color: string) => {
+    setFormatMenu(null);
+    editorRef.current?.focus();
+    restoreEditorSelection();
+    document.execCommand("styleWithCSS", false, "true");
+    if (!document.execCommand("hiliteColor", false, color)) {
+      document.execCommand("backColor", false, color);
+    }
+    handleEditorInput();
+    window.setTimeout(refreshToolbarState, 0);
+  };
+
+  const applyFontSize = (fontSize: string) => {
+    setFormatMenu(null);
+    editorRef.current?.focus();
+    restoreEditorSelection();
+    document.execCommand("fontSize", false, "7");
+    editorRef.current?.querySelectorAll("font[size='7']").forEach((node) => {
+      const font = node as HTMLElement;
+      const span = document.createElement("span");
+      span.style.fontSize = fontSize;
+      while (font.firstChild) span.appendChild(font.firstChild);
+      span.querySelectorAll<HTMLElement>("[style]").forEach((child) => {
+        child.style.fontSize = "";
+        if (!child.getAttribute("style")) child.removeAttribute("style");
+      });
+      font.replaceWith(span);
+    });
+    handleEditorInput();
+    window.setTimeout(refreshToolbarState, 0);
+  };
+
+  const insertDivider = () => {
+    const tempId = `divider-${Date.now()}`;
+    editorRef.current?.focus();
+    restoreEditorSelection();
+    document.execCommand(
+      "insertHTML",
+      false,
+      `<hr data-journal-divider="true"><p data-divider-caret="${tempId}"><br></p>`,
+    );
+    const paragraph = editorRef.current?.querySelector(`[data-divider-caret="${tempId}"]`);
+    if (paragraph instanceof HTMLElement) {
+      paragraph.removeAttribute("data-divider-caret");
+      placeCaretAtEnd(paragraph);
+      saveEditorSelection();
+    }
+    handleEditorInput();
+    window.setTimeout(refreshToolbarState, 0);
+    keepCaretInView();
+  };
+
   const toggleBlockCommand = (format: "H2" | "BLOCKQUOTE") => {
     editorRef.current?.focus();
+    restoreEditorSelection();
     const blockElement = currentBlockElement(editorRef.current);
     const currentFormat = String(document.queryCommandValue("formatBlock") ?? "").toLowerCase();
     const isActive =
@@ -803,9 +1338,14 @@ function JournalPage() {
   };
 
   const addLink = () => {
-    const url = prompt("Link URL")?.trim();
-    if (!url) return;
-    runCommand("createLink", url);
+    setTextDialog({
+      title: "Add link",
+      label: "URL",
+      placeholder: "https://",
+      confirmLabel: "Insert link",
+      inputMode: "url",
+      onSubmit: (url) => runCommand("createLink", url),
+    });
   };
 
   const addChecklistItem = () => {
@@ -836,6 +1376,7 @@ function JournalPage() {
 
     const tempId = `check-${Date.now()}`;
     editorRef.current?.focus();
+    restoreEditorSelection();
     document.execCommand("insertHTML", false, checklistItemHtml(false, "", tempId));
     const item = editorRef.current?.querySelector(`[data-checklist-temp="${tempId}"]`);
     if (item instanceof HTMLElement) {
@@ -886,6 +1427,7 @@ function JournalPage() {
   };
 
   const handleEditorClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    setFormatMenu(null);
     const target = event.target as HTMLElement;
     const toggle = target.closest("[data-checklist-toggle]") as HTMLElement | null;
     if (!toggle) return;
@@ -900,6 +1442,7 @@ function JournalPage() {
 
   const insertInlineAttachment = (attachment: JournalAttachmentRow, url = "") => {
     editorRef.current?.focus();
+    restoreEditorSelection();
     document.execCommand("insertHTML", false, inlineAttachmentHtml(attachment, url));
     handleEditorInput();
     keepCaretInView();
@@ -953,6 +1496,29 @@ function JournalPage() {
       : activeFolderId === "unfiled"
         ? "Unfiled"
         : (folderNameById.get(activeFolderId) ?? "Folder");
+  const selectedPageIndex =
+    selectedNote && selectedPage
+      ? selectedNote.pages.findIndex((page) => page.id === selectedPage.id)
+      : -1;
+  const canGoPreviousPage = selectedPageIndex > 0;
+  const canGoNextPage = selectedNote
+    ? selectedPageIndex >= 0 && selectedPageIndex < selectedNote.pages.length - 1
+    : false;
+  const visibleNoteIds = folderNotes.map((note) => note.id);
+  const allVisibleSelected =
+    visibleNoteIds.length > 0 && visibleNoteIds.every((id) => selectedNoteIds.includes(id));
+  const monthlyPageCount = notes.reduce(
+    (count, note) =>
+      count +
+      (note.pages.length
+        ? note.pages.filter((page) =>
+            isSameMonth(parseISO(page.entry_date ?? note.entry_date), calendarMonth),
+          ).length
+        : isSameMonth(parseISO(note.entry_date), calendarMonth)
+          ? 1
+          : 0),
+    0,
+  );
 
   return (
     <div className="px-4 pt-8 pb-6 animate-fade-up lg:px-6">
@@ -1021,10 +1587,7 @@ function JournalPage() {
         </div>
         <div className="mt-6 flex items-center justify-center gap-2 text-xs font-medium text-muted-foreground">
           <CalendarDays className="h-3.5 w-3.5 text-primary" />
-          <span>
-            {notes.filter((note) => isSameMonth(parseISO(note.entry_date), calendarMonth)).length}{" "}
-            this month
-          </span>
+          <span>{monthlyPageCount} this month</span>
         </div>
       </section>
 
@@ -1035,6 +1598,17 @@ function JournalPage() {
             <h2 className="text-2xl font-bold text-foreground">{selectedFolderLabel}</h2>
           </div>
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={toggleBulkMode}
+              className={`rounded-full border px-3 py-2 text-xs font-bold transition-colors ${
+                bulkMode
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-border bg-card text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {bulkMode ? "Done" : "Select"}
+            </button>
             <button
               type="button"
               onClick={addFolder}
@@ -1085,21 +1659,75 @@ function JournalPage() {
           ))}
         </div>
 
+        {bulkMode && (
+          <div className="relative mb-4 rounded-lg border border-border bg-card/60 p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={selectAllVisibleNotes}
+                className="rounded-full border border-border px-3 py-1.5 text-xs font-bold text-muted-foreground hover:text-foreground"
+              >
+                {allVisibleSelected ? "Clear visible" : "Select visible"}
+              </button>
+              <span className="text-xs font-medium text-muted-foreground">
+                {selectedNoteIds.length} selected
+              </span>
+              <div className="ml-auto flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setBulkMoveOpen((open) => !open)}
+                  disabled={!selectedNoteIds.length}
+                  className="rounded-full border border-border px-3 py-1.5 text-xs font-bold text-muted-foreground hover:text-foreground disabled:opacity-35"
+                >
+                  Move
+                </button>
+                <button
+                  type="button"
+                  onClick={deleteSelectedNotes}
+                  disabled={!selectedNoteIds.length}
+                  className="rounded-full border border-border px-3 py-1.5 text-xs font-bold text-destructive disabled:opacity-35"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+            {bulkMoveOpen && (
+              <div className="absolute right-3 left-3 z-30 mt-3 rounded-lg border border-border bg-popover p-2 shadow-xl">
+                <FolderPicker
+                  folders={folders}
+                  value="none"
+                  onChange={(folderId) => {
+                    void moveSelectedNotes(folderId);
+                  }}
+                />
+              </div>
+            )}
+          </div>
+        )}
+
         <NoteList
           notes={folderNotes}
           selectedNoteId={selectedNoteId}
+          selectionMode={bulkMode}
+          selectedNoteIds={selectedNoteIds}
           onSelect={selectNote}
+          onToggleSelect={toggleNoteSelection}
           emptyLabel="No notes here yet."
         />
       </section>
 
       {selectedNote && (
         <div className="fixed inset-0 z-50 bg-background">
-          <div className="mx-auto flex h-full max-w-3xl flex-col px-4">
-            <div className="flex shrink-0 items-center justify-between border-b border-border bg-background/95 py-3 backdrop-blur">
+          <div className="mx-auto flex h-full max-w-5xl flex-col px-4">
+            <div className="relative flex shrink-0 items-center justify-between border-b border-border bg-background/95 py-3 backdrop-blur">
               <button
                 type="button"
-                onClick={() => setSelectedNoteId(null)}
+                onClick={() => {
+                  setPagePickerOpen(false);
+                  setPageReorderMode(false);
+                  setNoteSettingsOpen(false);
+                  setSelectedNoteId(null);
+                }}
                 className="icon-button h-9 w-9 shrink-0"
                 aria-label="Close note"
                 title="Close note"
@@ -1112,6 +1740,32 @@ function JournalPage() {
                 </span>
                 <button
                   type="button"
+                  onClick={() => {
+                    setNoteSettingsOpen(false);
+                    if (pagePickerOpen) setPageReorderMode(false);
+                    setPagePickerOpen((open) => !open);
+                  }}
+                  className="icon-button h-9 w-9 shrink-0 md:hidden"
+                  aria-label="Pages"
+                  title="Pages"
+                >
+                  <List className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPagePickerOpen(false);
+                    setPageReorderMode(false);
+                    setNoteSettingsOpen((open) => !open);
+                  }}
+                  className="icon-button h-9 w-9 shrink-0"
+                  aria-label="Note settings"
+                  title="Note settings"
+                >
+                  <Settings2 className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
                   onClick={removeSelectedNote}
                   className="icon-button h-9 w-9 shrink-0 text-destructive"
                   aria-label="Delete note"
@@ -1120,151 +1774,151 @@ function JournalPage() {
                   <Trash2 className="h-4 w-4" />
                 </button>
               </div>
+              {pagePickerOpen && (
+                <MobilePageMenu
+                  pages={selectedNote.pages}
+                  selectedPageId={selectedPage?.id ?? null}
+                  reorderMode={pageReorderMode}
+                  canGoPrevious={canGoPreviousPage}
+                  canGoNext={canGoNextPage}
+                  onClose={() => {
+                    setPagePickerOpen(false);
+                    setPageReorderMode(false);
+                  }}
+                  onSelect={(pageId) => void selectPage(pageId)}
+                  onPrevious={() => goToAdjacentPage(-1)}
+                  onNext={() => goToAdjacentPage(1)}
+                  onAdd={() => void addPage()}
+                  onToggleReorderMode={() => setPageReorderMode((mode) => !mode)}
+                  onMoveUp={selectedPage ? () => void movePage(selectedPage.id, -1) : undefined}
+                  onMoveDown={selectedPage ? () => void movePage(selectedPage.id, 1) : undefined}
+                  onRename={selectedPage ? () => void renamePage(selectedPage) : undefined}
+                  onDelete={selectedPage ? () => void removePage(selectedPage) : undefined}
+                />
+              )}
+              {noteSettingsOpen && (
+                <NoteSettingsPanel
+                  folders={folders}
+                  draftNoteTitle={draftTitle}
+                  draftFolderId={draftFolderId}
+                  draftEntryDate={draftEntryDate}
+                  draftEntryTime={draftEntryTime}
+                  createdAt={selectedNote.created_at}
+                  updatedAt={selectedNote.updated_at}
+                  onClose={() => setNoteSettingsOpen(false)}
+                  onNoteTitleChange={(title) => {
+                    draftRef.current = { ...draftRef.current, title };
+                    setDraftTitle(title);
+                    markDirty();
+                  }}
+                  onFolderChange={(folderId) => {
+                    draftRef.current = { ...draftRef.current, folderId };
+                    setDraftFolderId(folderId);
+                    markDirty();
+                  }}
+                  onEntryDateChange={(entryDate) => {
+                    draftRef.current = { ...draftRef.current, entryDate };
+                    setDraftEntryDate(entryDate);
+                    markDirty();
+                  }}
+                  onEntryTimeChange={(entryTime) => {
+                    draftRef.current = { ...draftRef.current, entryTime };
+                    setDraftEntryTime(entryTime);
+                    markDirty();
+                  }}
+                />
+              )}
             </div>
 
-            <div
-              ref={editorScrollRef}
-              className="flex-1 overflow-auto pb-28"
-              style={{
-                paddingBottom: keyboardOffset ? `${keyboardOffset + 112}px` : undefined,
-              }}
-            >
-              <div className="px-1 py-5">
-                <div className="min-w-0">
-                  <label htmlFor="journal-title" className="sr-only">
-                    Note title
-                  </label>
-                  <input
-                    id="journal-title"
-                    value={draftTitle}
-                    onChange={(event) => {
-                      const title = event.target.value;
-                      draftRef.current = { ...draftRef.current, title };
-                      setDraftTitle(title);
-                      markDirty();
-                    }}
-                    className="w-full bg-transparent text-2xl font-bold text-foreground outline-none placeholder:text-muted-foreground"
-                    placeholder="Untitled"
-                  />
-                </div>
+            <div className="flex min-h-0 flex-1 gap-4">
+              <PageSidebar
+                pages={selectedNote.pages}
+                selectedPageId={selectedPage?.id ?? null}
+                reorderMode={pageReorderMode}
+                onSelect={(pageId) => void selectPage(pageId)}
+                onAdd={() => void addPage()}
+                onToggleReorderMode={() => setPageReorderMode((mode) => !mode)}
+                onRename={renamePage}
+                onDelete={(page) => void removePage(page)}
+                onMove={(pageId, direction) => void movePage(pageId, direction)}
+              />
 
-                <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                  <span>Created {format(parseISO(selectedNote.created_at), "MMM d, h:mm a")}</span>
-                  <span>Updated {format(parseISO(selectedNote.updated_at), "MMM d, h:mm a")}</span>
-                </div>
-
-                <div className="relative mt-4">
-                  <div className="flex flex-wrap gap-2">
-                    <MetaChip
-                      active={metaEditor === "stamp"}
-                      icon={<CalendarDays className="h-3.5 w-3.5" />}
-                      label={format(
-                        parseISO(`${draftEntryDate || todayISO()}T${draftEntryTime || "00:00"}`),
-                        "MMM d, h:mm a",
-                      )}
-                      onClick={() =>
-                        setMetaEditor((current) => (current === "stamp" ? null : "stamp"))
-                      }
-                    />
-                    <MetaChip
-                      active={metaEditor === "folder"}
-                      icon={<Folder className="h-3.5 w-3.5" />}
-                      label={
-                        draftFolderId === "none"
-                          ? "Unfiled"
-                          : (folderNameById.get(draftFolderId) ?? "Folder")
-                      }
-                      onClick={() =>
-                        setMetaEditor((current) => (current === "folder" ? null : "folder"))
-                      }
+              <div
+                ref={editorScrollRef}
+                className="min-w-0 flex-1 overflow-auto pb-28"
+                style={{
+                  paddingBottom: keyboardOffset ? `${keyboardOffset + 112}px` : undefined,
+                }}
+              >
+                <div className="px-1 py-5">
+                  <div className="min-w-0">
+                    {selectedPage && (
+                      <div className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-medium text-muted-foreground">
+                        <span className="truncate">{selectedPage.title}</span>
+                        <span aria-hidden>·</span>
+                        <span>{formatPageStamp(selectedPage)}</span>
+                      </div>
+                    )}
+                    <label htmlFor="journal-page-heading" className="sr-only">
+                      Page title
+                    </label>
+                    <input
+                      id="journal-page-heading"
+                      value={draftPageHeading}
+                      onChange={(event) => {
+                        const pageHeading = event.target.value;
+                        draftRef.current = { ...draftRef.current, pageHeading };
+                        setDraftPageHeading(pageHeading);
+                        markDirty();
+                      }}
+                      className="w-full bg-transparent text-2xl font-bold text-foreground outline-none placeholder:text-muted-foreground"
+                      placeholder="Entry title"
                     />
                   </div>
+                </div>
 
-                  {metaEditor && (
-                    <MetaPopover onClose={() => setMetaEditor(null)}>
-                      {metaEditor === "stamp" && (
-                        <div className="grid grid-cols-2 gap-2">
-                          <label className="space-y-1">
-                            <span className="text-[10px] font-bold uppercase text-muted-foreground">
-                              Date
-                            </span>
-                            <input
-                              type="date"
-                              value={draftEntryDate}
-                              onChange={(event) => {
-                                const entryDate = event.target.value;
-                                draftRef.current = { ...draftRef.current, entryDate };
-                                setDraftEntryDate(entryDate);
-                                markDirty();
-                              }}
-                              className="h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm text-foreground outline-none focus:ring-1 focus:ring-ring"
-                            />
-                          </label>
-                          <label className="space-y-1">
-                            <span className="text-[10px] font-bold uppercase text-muted-foreground">
-                              Time
-                            </span>
-                            <input
-                              type="time"
-                              value={draftEntryTime}
-                              onChange={(event) => {
-                                const entryTime = event.target.value;
-                                draftRef.current = { ...draftRef.current, entryTime };
-                                setDraftEntryTime(entryTime);
-                                markDirty();
-                              }}
-                              className="h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm text-foreground outline-none focus:ring-1 focus:ring-ring"
-                            />
-                          </label>
-                        </div>
-                      )}
-                      {metaEditor === "folder" && (
-                        <select
-                          value={draftFolderId}
-                          onChange={(event) => {
-                            const folderId = event.target.value;
-                            draftRef.current = { ...draftRef.current, folderId };
-                            setDraftFolderId(folderId);
-                            markDirty();
-                          }}
-                          className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm text-foreground outline-none focus:ring-1 focus:ring-ring"
-                        >
-                          <option value="none">Unfiled</option>
-                          {folders.map((folder) => (
-                            <option key={folder.id} value={folder.id}>
-                              {folder.name}
-                            </option>
-                          ))}
-                        </select>
-                      )}
-                    </MetaPopover>
+                <div className="px-1 pb-10">
+                  {selectedPage ? (
+                    <div
+                      ref={editorRef}
+                      contentEditable
+                      suppressContentEditableWarning
+                      onInput={handleEditorInput}
+                      onClick={handleEditorClick}
+                      onKeyDown={handleEditorKeyDown}
+                      onKeyUp={() => {
+                        saveEditorSelection();
+                        refreshToolbarState();
+                        keepCaretInView();
+                      }}
+                      onMouseUp={() => {
+                        saveEditorSelection();
+                        refreshToolbarState();
+                      }}
+                      onFocus={() => {
+                        scheduleEditorRestore();
+                        saveEditorSelection();
+                        refreshToolbarState();
+                        keepCaretInView();
+                      }}
+                      onBlur={() => {
+                        if (saveState === "dirty") void saveDraft();
+                      }}
+                      className="journal-editor min-h-[24rem] w-full bg-transparent px-1 py-3 text-base leading-7 text-foreground outline-none [&_a]:text-primary [&_blockquote]:border-l-4 [&_blockquote]:border-primary/50 [&_blockquote]:pl-3 [&_blockquote]:text-muted-foreground [&_h2]:mt-4 [&_h2]:mb-2 [&_h2]:text-xl [&_h2]:font-bold [&_hr]:my-6 [&_hr]:border-0 [&_hr]:border-t [&_hr]:border-border [&_li]:ml-5 [&_ol]:list-decimal [&_ul]:list-disc"
+                    />
+                  ) : (
+                    <div className="flex min-h-[18rem] items-center justify-center text-sm text-muted-foreground">
+                      <button
+                        type="button"
+                        onClick={() => void addPage()}
+                        className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 font-medium"
+                      >
+                        <Plus className="h-4 w-4" />
+                        Add page
+                      </button>
+                    </div>
                   )}
                 </div>
-              </div>
-
-              <div className="px-1 pb-10">
-                <div
-                  ref={editorRef}
-                  contentEditable
-                  suppressContentEditableWarning
-                  onInput={handleEditorInput}
-                  onClick={handleEditorClick}
-                  onKeyDown={handleEditorKeyDown}
-                  onKeyUp={() => {
-                    refreshToolbarState();
-                    keepCaretInView();
-                  }}
-                  onMouseUp={refreshToolbarState}
-                  onFocus={() => {
-                    scheduleEditorRestore();
-                    refreshToolbarState();
-                    keepCaretInView();
-                  }}
-                  onBlur={() => {
-                    if (saveState === "dirty") void saveDraft();
-                  }}
-                  className="journal-editor min-h-[24rem] w-full bg-transparent px-1 py-3 text-base leading-7 text-foreground outline-none [&_a]:text-primary [&_blockquote]:border-l-4 [&_blockquote]:border-primary/50 [&_blockquote]:pl-3 [&_blockquote]:text-muted-foreground [&_h2]:mt-4 [&_h2]:mb-2 [&_h2]:text-xl [&_h2]:font-bold [&_li]:ml-5 [&_ol]:list-decimal [&_ul]:list-disc"
-                />
               </div>
             </div>
 
@@ -1276,7 +1930,15 @@ function JournalPage() {
                 paddingBottom: keyboardOffset ? "0px" : "env(safe-area-inset-bottom)",
               }}
             >
-              <div className="mx-auto flex max-w-3xl items-center gap-2 overflow-x-auto px-4 py-3">
+              {formatMenu && (
+                <ToolbarFormatMenu
+                  menu={formatMenu}
+                  onTextColor={applyTextColor}
+                  onHighlightColor={applyHighlightColor}
+                  onFontSize={applyFontSize}
+                />
+              )}
+              <div className="mx-auto flex max-w-5xl items-center gap-2 overflow-x-auto px-4 py-3">
                 <ToolbarButton
                   label="Bold"
                   onClick={() => runCommand("bold")}
@@ -1295,6 +1957,33 @@ function JournalPage() {
                   active={toolbarState.underline}
                   icon={<Underline className="h-4 w-4" />}
                 />
+                <ToolbarButton
+                  label="Font size"
+                  onClick={() =>
+                    setFormatMenu((current) => (current === "fontSize" ? null : "fontSize"))
+                  }
+                  active={formatMenu === "fontSize"}
+                  icon={<Type className="h-4 w-4" />}
+                />
+                <ToolbarButton
+                  label="Text color"
+                  onClick={() =>
+                    setFormatMenu((current) => (current === "textColor" ? null : "textColor"))
+                  }
+                  active={formatMenu === "textColor"}
+                  icon={<Palette className="h-4 w-4" />}
+                />
+                <ToolbarButton
+                  label="Highlight"
+                  onClick={() =>
+                    setFormatMenu((current) =>
+                      current === "highlightColor" ? null : "highlightColor",
+                    )
+                  }
+                  active={formatMenu === "highlightColor"}
+                  icon={<Highlighter className="h-4 w-4" />}
+                />
+                <span className="mx-1 h-7 w-px shrink-0 bg-border" aria-hidden />
                 <ToolbarButton
                   label="Heading"
                   onClick={() => toggleBlockCommand("H2")}
@@ -1325,10 +2014,34 @@ function JournalPage() {
                   active={toolbarState.quote}
                   icon={<Quote className="h-4 w-4" />}
                 />
+                <span className="mx-1 h-7 w-px shrink-0 bg-border" aria-hidden />
+                <ToolbarButton
+                  label="Align left"
+                  onClick={() => runCommand("justifyLeft")}
+                  active={toolbarState.alignLeft}
+                  icon={<AlignLeft className="h-4 w-4" />}
+                />
+                <ToolbarButton
+                  label="Align center"
+                  onClick={() => runCommand("justifyCenter")}
+                  active={toolbarState.alignCenter}
+                  icon={<AlignCenter className="h-4 w-4" />}
+                />
+                <ToolbarButton
+                  label="Align right"
+                  onClick={() => runCommand("justifyRight")}
+                  active={toolbarState.alignRight}
+                  icon={<AlignRight className="h-4 w-4" />}
+                />
                 <ToolbarButton
                   label="Link"
                   onClick={addLink}
                   icon={<LinkIcon className="h-4 w-4" />}
+                />
+                <ToolbarButton
+                  label="Divider"
+                  onClick={insertDivider}
+                  icon={<Minus className="h-4 w-4" />}
                 />
                 <span className="mx-1 h-7 w-px shrink-0 bg-border" aria-hidden />
                 <ToolbarButton
@@ -1369,7 +2082,12 @@ function JournalPage() {
           onClose={() => setDayModalDate(null)}
           onAdd={() => addNote({ entryDate: dayModalDate })}
           onOpen={(noteId) => {
+            const note = notes.find((item) => item.id === noteId);
+            const page = note?.pages.find(
+              (item) => (item.entry_date ?? note.entry_date) === dayModalDate,
+            );
             setDayModalDate(null);
+            if (page) setSelectedPageId(page.id);
             selectNote(noteId);
           }}
         />
@@ -1387,6 +2105,9 @@ function JournalPage() {
           }}
         />
       )}
+
+      <AppTextDialog config={textDialog} onClose={() => setTextDialog(null)} />
+      <AppConfirmDialog config={confirmDialog} onClose={() => setConfirmDialog(null)} />
     </div>
   );
 }
@@ -1394,12 +2115,18 @@ function JournalPage() {
 function NoteList({
   notes,
   selectedNoteId,
+  selectionMode = false,
+  selectedNoteIds = [],
   onSelect,
+  onToggleSelect,
   emptyLabel,
 }: {
   notes: JournalNoteWithAttachments[];
   selectedNoteId: string | null;
+  selectionMode?: boolean;
+  selectedNoteIds?: string[];
   onSelect: (noteId: string) => void;
+  onToggleSelect?: (noteId: string) => void;
   emptyLabel: string;
 }) {
   if (notes.length === 0) {
@@ -1417,7 +2144,10 @@ function NoteList({
           <NoteListItem
             note={note}
             active={selectedNoteId === note.id}
+            selected={selectedNoteIds.includes(note.id)}
+            selectionMode={selectionMode}
             onSelect={() => onSelect(note.id)}
+            onToggleSelect={() => onToggleSelect?.(note.id)}
           />
         </li>
       ))}
@@ -1428,38 +2158,481 @@ function NoteList({
 function NoteListItem({
   note,
   active,
+  selected,
+  selectionMode,
   onSelect,
+  onToggleSelect,
 }: {
   note: JournalNoteWithAttachments;
   active: boolean;
+  selected: boolean;
+  selectionMode: boolean;
   onSelect: () => void;
+  onToggleSelect: () => void;
 }) {
   return (
     <button
       type="button"
-      onClick={onSelect}
+      onClick={selectionMode ? onToggleSelect : onSelect}
       className={`block w-full rounded-lg border px-4 py-3 text-left transition-colors ${
-        active
-          ? "border-primary bg-primary/10"
-          : "border-border bg-card/65 hover:border-primary/40 hover:bg-card"
+        selected
+          ? "border-primary bg-primary/15"
+          : active
+            ? "border-primary bg-primary/10"
+            : "border-border bg-card/65 hover:border-primary/40 hover:bg-card"
       }`}
     >
       <span className="flex items-start justify-between gap-3">
+        {selectionMode && (
+          <span
+            className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${
+              selected
+                ? "border-primary bg-primary text-primary-foreground"
+                : "border-border bg-background"
+            }`}
+            aria-hidden
+          >
+            {selected && <CheckSquare className="h-3.5 w-3.5" />}
+          </span>
+        )}
         <span className="min-w-0 flex-1">
           <span className="block truncate text-sm font-bold text-foreground">{note.title}</span>
           <span className="mt-1 block truncate text-xs text-muted-foreground">
-            {formatEntryStamp(note)}
-            {note.content_text ? ` · ${note.content_text}` : ""}
+            {notePageDateSummary(note)}
+            {notePreviewText(note) ? ` · ${notePreviewText(note)}` : ""}
           </span>
         </span>
-        {note.attachments.length > 0 && (
+        {(note.pages.length > 1 || note.attachments.length > 0) && (
           <span className="mt-0.5 inline-flex shrink-0 items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-            <Paperclip className="h-3 w-3" />
-            {note.attachments.length}
+            {note.pages.length > 1 ? (
+              <>
+                <FileText className="h-3 w-3" />
+                {note.pages.length}
+              </>
+            ) : (
+              <>
+                <Paperclip className="h-3 w-3" />
+                {note.attachments.length}
+              </>
+            )}
           </span>
         )}
       </span>
     </button>
+  );
+}
+
+function PageSidebar({
+  pages,
+  selectedPageId,
+  reorderMode,
+  onSelect,
+  onAdd,
+  onToggleReorderMode,
+  onRename,
+  onDelete,
+  onMove,
+}: {
+  pages: JournalNotePageRow[];
+  selectedPageId: string | null;
+  reorderMode: boolean;
+  onSelect: (pageId: string) => void;
+  onAdd: () => void;
+  onToggleReorderMode: () => void;
+  onRename: (page: JournalNotePageRow) => void;
+  onDelete: (page: JournalNotePageRow) => void;
+  onMove: (pageId: string, direction: -1 | 1) => void;
+}) {
+  return (
+    <aside className="hidden w-56 shrink-0 border-r border-border py-4 pr-3 md:block">
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <span className="text-xs font-bold uppercase text-muted-foreground">Pages</span>
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={onAdd}
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border text-muted-foreground hover:text-foreground"
+            aria-label="Add page"
+            title="Add page"
+          >
+            <Plus className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={onToggleReorderMode}
+            disabled={pages.length <= 1}
+            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border transition-colors disabled:opacity-35 ${
+              reorderMode
+                ? "border-primary bg-primary text-primary-foreground"
+                : "border-border text-muted-foreground hover:text-foreground"
+            }`}
+            aria-label={reorderMode ? "Done reordering pages" : "Reorder pages"}
+            title={reorderMode ? "Done reordering pages" : "Reorder pages"}
+          >
+            {reorderMode ? <Check className="h-4 w-4" /> : <ArrowUpDown className="h-4 w-4" />}
+          </button>
+        </div>
+      </div>
+      <ul className="space-y-1">
+        {pages.map((page, index) => (
+          <li key={page.id} className="group flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => onSelect(page.id)}
+              onDoubleClick={() => onRename(page)}
+              className={`min-w-0 flex-1 rounded-md px-3 py-2 text-left text-sm font-medium transition-colors ${
+                selectedPageId === page.id
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+              }`}
+            >
+              <span className="block truncate">{page.title}</span>
+              <span className="mt-0.5 block truncate text-[11px] opacity-70">
+                {formatPageStamp(page)}
+              </span>
+            </button>
+            {reorderMode ? (
+              <div className="flex h-9 w-6 shrink-0 flex-col">
+                <button
+                  type="button"
+                  onClick={() => onMove(page.id, -1)}
+                  disabled={index === 0}
+                  className="flex h-1/2 items-center justify-center rounded-t-full text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-25"
+                  aria-label={`Move ${page.title} up`}
+                  title={`Move ${page.title} up`}
+                >
+                  <ChevronUp className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onMove(page.id, 1)}
+                  disabled={index === pages.length - 1}
+                  className="flex h-1/2 items-center justify-center rounded-b-full text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-25"
+                  aria-label={`Move ${page.title} down`}
+                  title={`Move ${page.title} down`}
+                >
+                  <ChevronDown className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => onRename(page)}
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground opacity-0 transition-opacity hover:bg-muted hover:text-foreground group-hover:opacity-100"
+                  aria-label={`Rename ${page.title}`}
+                  title={`Rename ${page.title}`}
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onDelete(page)}
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground opacity-0 transition-opacity hover:bg-muted hover:text-destructive group-hover:opacity-100"
+                  aria-label={`Delete ${page.title}`}
+                  title={`Delete ${page.title}`}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </>
+            )}
+          </li>
+        ))}
+      </ul>
+    </aside>
+  );
+}
+
+function MobilePageMenu({
+  pages,
+  selectedPageId,
+  reorderMode,
+  canGoPrevious,
+  canGoNext,
+  onClose,
+  onSelect,
+  onPrevious,
+  onNext,
+  onAdd,
+  onToggleReorderMode,
+  onMoveUp,
+  onMoveDown,
+  onRename,
+  onDelete,
+}: {
+  pages: JournalNotePageRow[];
+  selectedPageId: string | null;
+  reorderMode: boolean;
+  canGoPrevious: boolean;
+  canGoNext: boolean;
+  onClose: () => void;
+  onSelect: (pageId: string) => void;
+  onPrevious: () => void;
+  onNext: () => void;
+  onAdd: () => void;
+  onToggleReorderMode: () => void;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
+  onRename?: () => void;
+  onDelete?: () => void;
+}) {
+  return (
+    <div className="absolute top-full right-0 left-0 z-40 mt-2 rounded-lg border border-border bg-popover p-3 shadow-xl md:hidden">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <span className="text-xs font-bold uppercase text-muted-foreground">Pages</span>
+        <button
+          type="button"
+          onClick={onClose}
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+          aria-label="Close pages"
+          title="Close pages"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+      <div className="mb-3 flex items-center gap-2">
+        <button
+          type="button"
+          onClick={onPrevious}
+          disabled={!canGoPrevious}
+          className="icon-button h-9 w-9 shrink-0 disabled:opacity-35"
+          aria-label="Previous page"
+          title="Previous page"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          onClick={onNext}
+          disabled={!canGoNext}
+          className="icon-button h-9 w-9 shrink-0 disabled:opacity-35"
+          aria-label="Next page"
+          title="Next page"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          onClick={onAdd}
+          className="icon-button h-9 w-9 shrink-0"
+          aria-label="Add page"
+          title="Add page"
+        >
+          <Plus className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          onClick={onToggleReorderMode}
+          disabled={pages.length <= 1}
+          className={`flex h-8 w-8 items-center justify-center rounded-full border transition-colors disabled:opacity-35 ${
+            reorderMode
+              ? "border-primary bg-primary text-primary-foreground"
+              : "border-border text-muted-foreground"
+          }`}
+          aria-label={reorderMode ? "Done reordering pages" : "Reorder pages"}
+          title={reorderMode ? "Done reordering pages" : "Reorder pages"}
+        >
+          {reorderMode ? (
+            <Check className="h-3.5 w-3.5" />
+          ) : (
+            <ArrowUpDown className="h-3.5 w-3.5" />
+          )}
+        </button>
+        {reorderMode ? (
+          <>
+            <button
+              type="button"
+              onClick={onMoveUp}
+              disabled={!onMoveUp || !canGoPrevious}
+              className="flex h-8 w-8 items-center justify-center rounded-full border border-border text-muted-foreground disabled:opacity-35"
+              aria-label="Move page up"
+              title="Move page up"
+            >
+              <ChevronUp className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={onMoveDown}
+              disabled={!onMoveDown || !canGoNext}
+              className="flex h-8 w-8 items-center justify-center rounded-full border border-border text-muted-foreground disabled:opacity-35"
+              aria-label="Move page down"
+              title="Move page down"
+            >
+              <ChevronDown className="h-3.5 w-3.5" />
+            </button>
+          </>
+        ) : (
+          <>
+            <button
+              type="button"
+              onClick={onRename}
+              disabled={!onRename}
+              className="flex h-8 w-8 items-center justify-center rounded-full border border-border text-muted-foreground disabled:opacity-35"
+              aria-label="Rename page"
+              title="Rename page"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={onDelete}
+              disabled={!onDelete || pages.length <= 1}
+              className="flex h-8 w-8 items-center justify-center rounded-full border border-border text-muted-foreground disabled:opacity-35"
+              aria-label="Delete page"
+              title="Delete page"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          </>
+        )}
+      </div>
+      <div className="max-h-72 space-y-1 overflow-auto">
+        {pages.map((page) => (
+          <button
+            key={page.id}
+            type="button"
+            onClick={() => {
+              onSelect(page.id);
+              if (!reorderMode) onClose();
+            }}
+            className={`flex w-full items-center justify-between gap-3 rounded-md px-3 py-2 text-left text-sm font-medium ${
+              selectedPageId === page.id
+                ? "bg-primary text-primary-foreground"
+                : "text-popover-foreground hover:bg-muted"
+            }`}
+          >
+            <span className="min-w-0">
+              <span className="block truncate">{page.title}</span>
+              <span className="block truncate text-[11px] opacity-70">{formatPageStamp(page)}</span>
+            </span>
+            {selectedPageId === page.id && <CheckSquare className="h-4 w-4 shrink-0" />}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function NoteSettingsPanel({
+  folders,
+  draftNoteTitle,
+  draftFolderId,
+  draftEntryDate,
+  draftEntryTime,
+  createdAt,
+  updatedAt,
+  onClose,
+  onNoteTitleChange,
+  onFolderChange,
+  onEntryDateChange,
+  onEntryTimeChange,
+}: {
+  folders: JournalFolderRow[];
+  draftNoteTitle: string;
+  draftFolderId: string;
+  draftEntryDate: string;
+  draftEntryTime: string;
+  createdAt: string;
+  updatedAt: string;
+  onClose: () => void;
+  onNoteTitleChange: (title: string) => void;
+  onFolderChange: (folderId: string) => void;
+  onEntryDateChange: (entryDate: string) => void;
+  onEntryTimeChange: (entryTime: string) => void;
+}) {
+  return (
+    <div className="absolute top-full right-0 z-40 mt-2 w-full rounded-lg border border-border bg-popover p-4 shadow-xl sm:max-w-sm">
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-bold uppercase text-muted-foreground">Settings</p>
+          <h2 className="text-lg font-bold text-foreground">
+            {draftNoteTitle.trim() || "Untitled note"}
+          </h2>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+          aria-label="Close settings"
+          title="Close settings"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+
+      <label className="mb-4 block space-y-1">
+        <span className="text-[10px] font-bold uppercase text-muted-foreground">Note name</span>
+        <input
+          value={draftNoteTitle}
+          onChange={(event) => onNoteTitleChange(event.target.value)}
+          className="h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm text-foreground outline-none focus:ring-1 focus:ring-ring"
+          placeholder="Journal"
+        />
+      </label>
+
+      <div className="mb-4 grid grid-cols-2 gap-2">
+        <label className="space-y-1">
+          <span className="text-[10px] font-bold uppercase text-muted-foreground">Page date</span>
+          <input
+            type="date"
+            value={draftEntryDate}
+            onChange={(event) => onEntryDateChange(event.target.value)}
+            className="h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm text-foreground outline-none focus:ring-1 focus:ring-ring"
+          />
+        </label>
+        <label className="space-y-1">
+          <span className="text-[10px] font-bold uppercase text-muted-foreground">Page time</span>
+          <input
+            type="time"
+            value={draftEntryTime}
+            onChange={(event) => onEntryTimeChange(event.target.value)}
+            className="h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm text-foreground outline-none focus:ring-1 focus:ring-ring"
+          />
+        </label>
+      </div>
+
+      <div className="mb-4">
+        <p className="mb-1.5 text-[10px] font-bold uppercase text-muted-foreground">Folder</p>
+        <FolderPicker folders={folders} value={draftFolderId} onChange={onFolderChange} />
+      </div>
+
+      <div className="flex flex-wrap gap-2 text-[11px] text-muted-foreground">
+        <span>Created {format(parseISO(createdAt), "MMM d, h:mm a")}</span>
+        <span>Updated {format(parseISO(updatedAt), "MMM d, h:mm a")}</span>
+      </div>
+    </div>
+  );
+}
+
+function FolderPicker({
+  folders,
+  value,
+  onChange,
+}: {
+  folders: JournalFolderRow[];
+  value: string;
+  onChange: (folderId: string) => void;
+}) {
+  const options = [{ id: "none", name: "Unfiled" }, ...folders];
+
+  return (
+    <div className="max-h-64 space-y-1 overflow-auto">
+      {options.map((folder) => (
+        <button
+          key={folder.id}
+          type="button"
+          onClick={() => onChange(folder.id)}
+          className={`flex w-full items-center justify-between gap-3 rounded-md px-3 py-2 text-left text-sm font-medium ${
+            value === folder.id
+              ? "bg-primary text-primary-foreground"
+              : "text-foreground hover:bg-muted"
+          }`}
+        >
+          <span className="min-w-0 truncate">{folder.name}</span>
+          {value === folder.id && <CheckSquare className="h-4 w-4 shrink-0" />}
+        </button>
+      ))}
+    </div>
   );
 }
 
@@ -1674,48 +2847,55 @@ function FolderRow({
   );
 }
 
-function MetaChip({
-  active,
-  icon,
-  label,
-  onClick,
+function ToolbarFormatMenu({
+  menu,
+  onTextColor,
+  onHighlightColor,
+  onFontSize,
 }: {
-  active: boolean;
-  icon: React.ReactNode;
-  label: string;
-  onClick: () => void;
+  menu: Exclude<FormatMenu, null>;
+  onTextColor: (color: string) => void;
+  onHighlightColor: (color: string) => void;
+  onFontSize: (fontSize: string) => void;
 }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`inline-flex max-w-full items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-xs font-medium transition-colors ${
-        active
-          ? "border-primary bg-primary/10 text-foreground"
-          : "border-border bg-card/60 text-muted-foreground hover:text-foreground"
-      }`}
-    >
-      <span className="shrink-0">{icon}</span>
-      <span className="max-w-44 truncate">{label}</span>
-      <Pencil className="h-3 w-3 shrink-0 opacity-70" />
-    </button>
-  );
-}
+  const colorOptions = menu === "textColor" ? TEXT_COLOR_OPTIONS : HIGHLIGHT_COLOR_OPTIONS;
 
-function MetaPopover({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
   return (
-    <div className="absolute top-full left-0 z-20 mt-2 w-full max-w-sm rounded-lg border border-border bg-card p-3 shadow-xl">
-      <div className="flex items-start gap-2">
-        <div className="min-w-0 flex-1">{children}</div>
-        <button
-          type="button"
-          onClick={onClose}
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
-          aria-label="Close"
-          title="Close"
-        >
-          <X className="h-4 w-4" />
-        </button>
+    <div className="mx-auto max-w-5xl px-4 pt-3">
+      <div className="inline-flex max-w-full items-center gap-2 overflow-x-auto rounded-full border border-border bg-background px-2 py-2 shadow-lg">
+        {menu === "fontSize"
+          ? FONT_SIZE_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => onFontSize(option.value)}
+                className="flex h-8 min-w-10 shrink-0 items-center justify-center rounded-full border border-border px-3 text-sm font-semibold text-foreground transition-colors hover:bg-muted"
+                aria-label={`${option.label}px text`}
+                title={`${option.label}px text`}
+              >
+                {option.label}
+              </button>
+            ))
+          : colorOptions.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() =>
+                  menu === "textColor" ? onTextColor(option.value) : onHighlightColor(option.value)
+                }
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border bg-background transition-transform hover:scale-105"
+                aria-label={`${option.label} ${menu === "textColor" ? "text" : "highlight"}`}
+                title={`${option.label} ${menu === "textColor" ? "text" : "highlight"}`}
+              >
+                <span
+                  className="h-5 w-5 rounded-full border border-black/10"
+                  style={{ backgroundColor: option.value }}
+                  aria-hidden
+                />
+              </button>
+            ))}
       </div>
     </div>
   );
@@ -1759,6 +2939,44 @@ function sortJournalNotes(notes: JournalNoteWithAttachments[]) {
   return [...notes].sort(
     (a, b) => parseISO(b.updated_at).getTime() - parseISO(a.updated_at).getTime(),
   );
+}
+
+function sortJournalPages(pages: JournalNotePageRow[]) {
+  return [...pages].sort(
+    (a, b) =>
+      a.sort_order - b.sort_order ||
+      parseISO(a.created_at).getTime() - parseISO(b.created_at).getTime(),
+  );
+}
+
+function reorderJournalPages(pages: JournalNotePageRow[], pageId: string, direction: -1 | 1) {
+  const ordered = sortJournalPages(pages);
+  const pageIndex = ordered.findIndex((page) => page.id === pageId);
+  const targetIndex = pageIndex + direction;
+  if (pageIndex < 0 || targetIndex < 0 || targetIndex >= ordered.length) return null;
+
+  const reordered = [...ordered];
+  [reordered[pageIndex], reordered[targetIndex]] = [reordered[targetIndex], reordered[pageIndex]];
+  return reordered.map((page, sortOrder) => ({ ...page, sort_order: sortOrder }));
+}
+
+function notePreviewText(note: JournalNoteWithAttachments) {
+  const page = note.pages.find((item) => item.heading || item.content_text);
+  return page ? page.heading || page.content_text : note.content_text;
+}
+
+function notePageDateSummary(note: JournalNoteWithAttachments) {
+  if (!note.pages.length) return formatEntryStamp(note);
+  const dates = note.pages
+    .map((page) => page.entry_date ?? note.entry_date)
+    .filter(Boolean)
+    .filter((date, index, all) => all.indexOf(date) === index)
+    .sort();
+  if (!dates.length) return formatEntryStamp(note);
+  if (dates.length === 1) return formatPageStamp(note.pages[0]);
+  const first = parseISO(`${dates[0]}T00:00:00`);
+  const last = parseISO(`${dates[dates.length - 1]}T00:00:00`);
+  return `${format(first, "MMM d")} - ${format(last, "MMM d")}`;
 }
 
 function sortFolders(a: JournalFolderRow, b: JournalFolderRow) {
@@ -1916,7 +3134,9 @@ function ensureEditableBreaksAfterBlocks(root: ParentNode | null) {
   if (!root) return;
   removeBlankLinesBetweenChecklistItems(root);
   root
-    .querySelectorAll("[data-journal-attachment-id], [data-checklist-item], blockquote, ul, ol, h2")
+    .querySelectorAll(
+      "[data-journal-attachment-id], [data-checklist-item], blockquote, ul, ol, h2, hr",
+    )
     .forEach((node) => {
       const element = node as HTMLElement;
       if (element.closest("ul, ol") && !["UL", "OL"].includes(element.tagName)) return;
@@ -1935,7 +3155,7 @@ function ensureEditableBreaksAfterBlocks(root: ParentNode | null) {
         nextElement &&
         !nextElement.hasAttribute("data-journal-attachment-id") &&
         !nextElement.hasAttribute("data-checklist-item") &&
-        !["BLOCKQUOTE", "UL", "OL", "H2"].includes(nextElement.tagName) &&
+        !["BLOCKQUOTE", "UL", "OL", "H2", "HR"].includes(nextElement.tagName) &&
         ["P", "DIV", "BR"].includes(nextElement.tagName);
 
       if (nextIsEditableLine) return;
@@ -2096,6 +3316,40 @@ function attachmentIdsFromHtml(html: string) {
   return ids;
 }
 
+function attachmentIdsFromPages(
+  pages: JournalNotePageRow[],
+  activePageId: string,
+  activeHtml: string,
+) {
+  const ids = new Set<string>();
+  if (!pages.length) {
+    attachmentIdsFromHtml(activeHtml).forEach((id) => ids.add(id));
+    return ids;
+  }
+  pages.forEach((page) => {
+    attachmentIdsFromHtml(page.id === activePageId ? activeHtml : page.content_html).forEach((id) =>
+      ids.add(id),
+    );
+  });
+  return ids;
+}
+
+function noteTextFromPages(
+  pages: JournalNotePageRow[],
+  activePageId: string,
+  activeText: string,
+  activeHeading: string,
+) {
+  const texts = pages.length
+    ? pages.map((page) => {
+        const heading = page.id === activePageId ? activeHeading : page.heading;
+        const content = page.id === activePageId ? activeText : page.content_text;
+        return [heading, content].filter(Boolean).join(" ");
+      })
+    : [activeHeading, activeText];
+  return texts.filter(Boolean).join(" · ");
+}
+
 function inlineAttachmentHtml(attachment: JournalAttachmentRow, url = "") {
   return `<figure class="my-4" contenteditable="false" data-journal-attachment-id="${escapeHtml(
     attachment.id,
@@ -2180,7 +3434,7 @@ function hasMeaningfulEditorHtml(html: string) {
   template.innerHTML = html;
   if (
     template.content.querySelector(
-      "[data-journal-attachment-id], [data-checklist-item], img, video, audio, iframe",
+      "[data-journal-attachment-id], [data-checklist-item], hr, img, video, audio, iframe",
     )
   ) {
     return true;
@@ -2230,7 +3484,12 @@ function normalizeTimeValue(value: string | null | undefined) {
 }
 
 function formatEntryStamp(note: JournalNoteWithAttachments) {
-  const date = parseISO(`${note.entry_date}T${normalizeTimeValue(note.entry_time)}`);
+  const date = parseISO(`${note.entry_date ?? todayISO()}T${normalizeTimeValue(note.entry_time)}`);
+  return format(date, "MMM d, h:mm a");
+}
+
+function formatPageStamp(page: JournalNotePageRow) {
+  const date = parseISO(`${page.entry_date ?? todayISO()}T${normalizeTimeValue(page.entry_time)}`);
   return format(date, "MMM d, h:mm a");
 }
 

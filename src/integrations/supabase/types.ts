@@ -114,6 +114,59 @@ export type Database = {
         };
         Relationships: [];
       };
+      journal_note_pages: {
+        Row: {
+          content_html: string;
+          content_text: string;
+          created_at: string;
+          entry_date: string;
+          entry_time: string;
+          heading: string;
+          id: string;
+          note_id: string;
+          sort_order: number;
+          title: string;
+          updated_at: string;
+          user_id: string;
+        };
+        Insert: {
+          content_html?: string;
+          content_text?: string;
+          created_at?: string;
+          entry_date?: string;
+          entry_time?: string;
+          heading?: string;
+          id?: string;
+          note_id: string;
+          sort_order?: number;
+          title?: string;
+          updated_at?: string;
+          user_id: string;
+        };
+        Update: {
+          content_html?: string;
+          content_text?: string;
+          created_at?: string;
+          entry_date?: string;
+          entry_time?: string;
+          heading?: string;
+          id?: string;
+          note_id?: string;
+          sort_order?: number;
+          title?: string;
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "journal_note_pages_note_id_fkey";
+            columns: ["note_id"];
+            isOneToOne: false;
+            referencedRelation: "journal_notes";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       journal_notes: {
         Row: {
           content_html: string;

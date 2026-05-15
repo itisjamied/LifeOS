@@ -8,6 +8,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { AppConfirmDialog, type AppConfirmDialogConfig } from "@/components/ui/app-dialog";
 import {
   Plus,
   Trash2,
@@ -358,6 +359,7 @@ function TaskEditor({
   });
   const [busy, setBusy] = useState(false);
   const [activeDay, setActiveDay] = useState<number | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<AppConfirmDialogConfig | null>(null);
   const [dayMenuPosition, setDayMenuPosition] = useState<{
     left: number;
     bottom: number;
@@ -405,19 +407,29 @@ function TaskEditor({
   };
 
   const deleteVariant = async (id: string) => {
-    if (!confirm("Delete this variant? Days using it will become empty.")) return;
-    setBusy(true);
-    // Clear schedule entries pointing at this variant
-    await supabase.from("task_schedule").delete().eq("variant_id", id);
-    const { error } = await supabase.from("task_variants").delete().eq("id", id);
-    setBusy(false);
-    if (error) return toast.error(error.message);
-    setVariants((vs) => vs.filter((v) => v.id !== id));
-    setSchedule((m) => {
-      const out = { ...m };
-      for (const d in out)
-        if (out[d as unknown as number] === id) out[d as unknown as number] = null;
-      return out;
+    setConfirmDialog({
+      title: "Delete variant?",
+      description: "Days using it will become empty.",
+      confirmLabel: "Delete variant",
+      destructive: true,
+      onConfirm: async () => {
+        setBusy(true);
+        // Clear schedule entries pointing at this variant
+        await supabase.from("task_schedule").delete().eq("variant_id", id);
+        const { error } = await supabase.from("task_variants").delete().eq("id", id);
+        setBusy(false);
+        if (error) {
+          toast.error(error.message);
+          return;
+        }
+        setVariants((vs) => vs.filter((v) => v.id !== id));
+        setSchedule((m) => {
+          const out = { ...m };
+          for (const d in out)
+            if (out[d as unknown as number] === id) out[d as unknown as number] = null;
+          return out;
+        });
+      },
     });
   };
 
@@ -532,16 +544,26 @@ function TaskEditor({
   };
 
   const deleteTask = async () => {
-    if (!confirm(`Delete "${full.task.name}" and all its variants and history?`)) return;
-    setBusy(true);
-    await supabase.from("completions").delete().eq("task_id", full.task.id);
-    await supabase.from("task_schedule").delete().eq("task_id", full.task.id);
-    await supabase.from("task_variants").delete().eq("task_id", full.task.id);
-    const { error } = await supabase.from("tasks").delete().eq("id", full.task.id);
-    setBusy(false);
-    if (error) return toast.error(error.message);
-    await onChange();
-    onClose();
+    setConfirmDialog({
+      title: "Delete task?",
+      description: `"${full.task.name}" and all of its variants and history will be deleted.`,
+      confirmLabel: "Delete task",
+      destructive: true,
+      onConfirm: async () => {
+        setBusy(true);
+        await supabase.from("completions").delete().eq("task_id", full.task.id);
+        await supabase.from("task_schedule").delete().eq("task_id", full.task.id);
+        await supabase.from("task_variants").delete().eq("task_id", full.task.id);
+        const { error } = await supabase.from("tasks").delete().eq("id", full.task.id);
+        setBusy(false);
+        if (error) {
+          toast.error(error.message);
+          return;
+        }
+        await onChange();
+        onClose();
+      },
+    });
   };
 
   return (
@@ -825,6 +847,7 @@ function TaskEditor({
       >
         <Trash2 className="h-4 w-4" /> Delete this task
       </Button>
+      <AppConfirmDialog config={confirmDialog} onClose={() => setConfirmDialog(null)} />
     </div>
   );
 }
