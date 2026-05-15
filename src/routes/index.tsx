@@ -19,7 +19,9 @@ import {
   ChevronRight,
   CalendarDays,
   CircleDashed,
+  Flame,
   Plus,
+  Pencil,
   Sparkles,
   Sun,
   Moon,
@@ -213,11 +215,8 @@ function TodayPage() {
               {isViewingToday ? "Today" : format(viewDate, "MMM d")}
             </h1>
           </div>
-          <div className="flex flex-col gap-y-4 items-center gap-2">
+          <div className="flex h-full items-center justify-end">
             <ThemeToggle />
-            <Link to="/grid" className="icon-button" aria-label="Cycle grid" title="Cycle grid">
-              <CalendarDays className="h-[18px] w-[18px]" />
-            </Link>
           </div>
         </div>
       </header>
@@ -271,6 +270,8 @@ function TodayPage() {
         }}
         unfinishedCounts={unfinishedCounts}
       />
+
+      {/* <RoutineTools /> */}
 
       {todaysTasks.length === 0 ? (
         <div className="surface p-8 text-center text-muted-foreground">
@@ -330,7 +331,46 @@ function TodayPage() {
           )}
         </>
       )}
+
+      <RoutineTools />
     </div>
+  );
+}
+
+function RoutineTools() {
+  const tools = [
+    {
+      to: "/grid",
+      label: "Calendar",
+      icon: <CalendarDays className="h-4 w-4" />,
+    },
+    {
+      to: "/stats",
+      label: "Progress",
+      icon: <Flame className="h-4 w-4" />,
+    },
+    {
+      to: "/manage",
+      label: "Edit",
+      icon: <Pencil className="h-4 w-4" />,
+    },
+  ] as const;
+
+  return (
+    <nav className="mb-6 grid grid-cols-3 gap-2" aria-label="Routine tools">
+      {tools.map((tool) => (
+        <Link
+          key={tool.to}
+          to={tool.to}
+          className="surface surface-interactive flex min-h-14 items-center justify-center gap-2 px-2 text-xs font-black text-foreground"
+        >
+          <span className="text-primary" aria-hidden>
+            {tool.icon}
+          </span>
+          <span className="truncate">{tool.label}</span>
+        </Link>
+      ))}
+    </nav>
   );
 }
 

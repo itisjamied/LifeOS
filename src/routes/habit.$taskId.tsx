@@ -96,7 +96,7 @@ function HabitDetailPage() {
 
   return (
     <div className="px-5 pt-8 pb-6 animate-fade-up">
-      <Link to="/stats" className="icon-button" aria-label="Back to stats" title="Back to stats">
+      <Link to="/" className="icon-button" aria-label="Back to Today" title="Back to Today">
         <ChevronLeft className="h-4 w-4" />
       </Link>
       <header className="mt-4 mb-5 text-center">

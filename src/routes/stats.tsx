@@ -4,7 +4,7 @@ import { useAuth } from "@/lib/auth-context";
 import { fetchAllRoutine, fetchProfile, type FullTask } from "@/lib/routine-data";
 import { computeStats, type TaskStats } from "@/lib/streaks";
 import { parseISO } from "date-fns";
-import { Flame, Sparkles, Trophy, ArrowUpDown, UserRound } from "lucide-react";
+import { ChevronLeft, Flame, Sparkles, Trophy, ArrowUpDown } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { colorValue, glyphFor } from "@/lib/symbols";
 
@@ -13,7 +13,7 @@ const STATS_WINDOW_DAYS = 28;
 export const Route = createFileRoute("/stats")({
   head: () => ({
     meta: [
-      { title: "Stats — Cycle" },
+      { title: "Progress — Cycle" },
       { name: "description", content: "Your habit streaks and consistency over the last 28 days." },
     ],
   }),
@@ -94,12 +94,12 @@ function StatsPage() {
     <div className="px-5 pt-8 pb-6 animate-fade-up">
       <header className="mb-6">
         <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3">
-          <Link to="/settings" className="icon-button" aria-label="Settings" title="Settings">
-            <UserRound className="h-[18px] w-[18px]" />
+          <Link to="/" className="icon-button" aria-label="Back to Today" title="Back to Today">
+            <ChevronLeft className="h-[18px] w-[18px]" />
           </Link>
           <div className="text-center">
             <p className="text-[11px] font-semibold uppercase text-muted-foreground">28 days</p>
-            <h1 className="mt-1 text-3xl text-foreground">Stats</h1>
+            <h1 className="mt-1 text-3xl text-foreground">Progress</h1>
           </div>
           <ThemeToggle />
         </div>

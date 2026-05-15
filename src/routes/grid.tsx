@@ -5,13 +5,13 @@ import { fetchAllRoutine, fetchProfile, type FullTask } from "@/lib/routine-data
 import { cycleDayFor } from "@/lib/cycle";
 import { glyphFor, colorValue } from "@/lib/symbols";
 import { parseISO } from "date-fns";
-import { CalendarDays, Sparkles, UserRound } from "lucide-react";
+import { CalendarDays, ChevronLeft, Sparkles } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 export const Route = createFileRoute("/grid")({
   head: () => ({
     meta: [
-      { title: "Cycle grid — your 28 days" },
+      { title: "Cycle calendar — Cycle" },
       { name: "description", content: "See the whole 28-day routine at a glance." },
     ],
   }),
@@ -54,12 +54,12 @@ function GridPage() {
     <div className="px-4 pt-8 pb-6 animate-fade-up">
       <header className="mb-6">
         <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3">
-          <Link to="/settings" className="icon-button" aria-label="Settings" title="Settings">
-            <UserRound className="h-[18px] w-[18px]" />
+          <Link to="/" className="icon-button" aria-label="Back to Today" title="Back to Today">
+            <ChevronLeft className="h-[18px] w-[18px]" />
           </Link>
           <div className="text-center">
             <p className="text-[11px] font-semibold uppercase text-muted-foreground">28 days</p>
-            <h1 className="mt-1 text-3xl text-foreground">Cycle</h1>
+            <h1 className="mt-1 text-3xl text-foreground">Calendar</h1>
           </div>
           <ThemeToggle />
         </div>
