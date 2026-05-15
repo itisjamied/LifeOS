@@ -38,8 +38,8 @@
       "icons": [{ "src": "/app-icon-192.png", "sizes": "192x192" }]
     },
     {
-      "name": "Stats",
-      "short_name": "Stats",
+      "name": "Progress",
+      "short_name": "Progress",
       "url": "/stats",
       "icons": [{ "src": "/app-icon-192.png", "sizes": "192x192" }]
     }
