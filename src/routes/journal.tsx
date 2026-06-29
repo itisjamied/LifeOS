@@ -1796,7 +1796,7 @@ function JournalPage() {
         </div>
 
         {folders.length > 0 && (
-          <div className="mb-5 grid gap-2 border-b border-border/70 pb-5 md:flex md:gap-2 md:overflow-x-auto md:border-b-0 md:pb-1">
+          <div className="mb-5 grid gap-2 border-b border-border/70 pb-5 md:grid-cols-3 md:border-b-0 md:pb-1">
             {folders.map((folder) => (
               <FolderRow
                 key={folder.id}
@@ -3015,7 +3015,7 @@ function FolderRow({
 }) {
   return (
     <div
-      className={`group flex w-full items-center rounded-lg border transition-colors md:w-auto md:shrink-0 md:rounded-full ${
+      className={`group relative flex w-full items-center rounded-lg border transition-colors md:min-h-24 md:items-stretch ${
         active
           ? "border-primary bg-primary text-primary-foreground"
           : "border-border bg-card/65 text-muted-foreground hover:bg-card hover:text-foreground"
@@ -3025,17 +3025,23 @@ function FolderRow({
         type="button"
         onClick={onClick}
         onDoubleClick={onRename}
-        className="flex min-w-0 flex-1 items-center gap-3 px-4 py-3 text-left text-sm font-medium md:flex-none md:gap-2 md:px-3 md:py-2"
+        className="flex min-w-0 flex-1 items-center gap-3 px-4 py-3 text-left text-sm font-medium md:flex-col md:justify-center md:gap-2 md:px-2 md:text-center md:text-xs md:font-bold"
       >
-        <span className="shrink-0">{icon}</span>
-        <span className="min-w-0 flex-1 truncate md:max-w-28 md:flex-none">{label}</span>
-        <span className="text-xs opacity-70">{count}</span>
+        <span className="shrink-0 md:flex md:h-9 md:w-9 md:items-center md:justify-center md:rounded-full md:bg-background/70">
+          {icon}
+        </span>
+        <span className="min-w-0 flex-1 truncate md:line-clamp-2 md:max-w-full md:flex-none md:leading-tight">
+          {label}
+        </span>
+        <span className="text-xs opacity-70 md:rounded-full md:bg-background/70 md:px-2 md:py-0.5 md:text-[10px] md:opacity-80">
+          {count}
+        </span>
       </button>
       {onDelete && (
         <button
           type="button"
           onClick={onDelete}
-          className={`mr-2 flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-opacity md:mr-1 md:h-7 md:w-7 md:opacity-0 md:group-hover:opacity-100 ${
+          className={`mr-2 flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-opacity md:absolute md:top-1 md:right-1 md:mr-0 md:h-6 md:w-6 md:bg-background/70 ${
             active ? "hover:bg-white/15" : "hover:bg-background"
           }`}
           aria-label={`Delete ${label}`}
