@@ -10,7 +10,7 @@ import { useEffect } from "react";
 import appCss from "../styles.css?url";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { Toaster } from "@/components/ui/sonner";
-import { BookOpen, ListChecks, Settings } from "lucide-react";
+import { BookOpen, ListChecks, Settings, Target } from "lucide-react";
 
 function NotFoundComponent() {
   return (
@@ -143,6 +143,7 @@ function BottomNav() {
     >
       <div className="mx-auto flex max-w-md">
         {tab("/", <ListChecks className="h-5 w-5" />, "Today", isTodayArea)}
+        {tab("/goals", <Target className="h-5 w-5" />, "Goals")}
         {tab("/journal", <BookOpen className="h-5 w-5" />, "Journal")}
         {tab("/settings", <Settings className="h-5 w-5" />, "Settings")}
       </div>
