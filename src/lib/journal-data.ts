@@ -1,6 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
-import { todayISO } from "@/lib/cycle";
+import { todayISO } from "@/lib/schedule";
 
 export const JOURNAL_ATTACHMENTS_BUCKET = "journal-attachments";
 

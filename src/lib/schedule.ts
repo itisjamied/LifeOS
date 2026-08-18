@@ -1,8 +1,8 @@
 import { differenceInCalendarDays, formatISO, startOfDay } from "date-fns";
 
-/** Returns the cycle day (1..28) for a given actual date and cycle start. */
-export function cycleDayFor(date: Date, cycleStart: Date): number {
-  const diff = differenceInCalendarDays(startOfDay(date), startOfDay(cycleStart));
+/** Returns the recurring schedule position for a given date and schedule start. */
+export function scheduleDayFor(date: Date, scheduleStart: Date): number {
+  const diff = differenceInCalendarDays(startOfDay(date), startOfDay(scheduleStart));
   // Modulo, handling negatives
   const m = ((diff % 28) + 28) % 28;
   return m + 1;

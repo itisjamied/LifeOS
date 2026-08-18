@@ -1,6 +1,6 @@
 import { addDays, format, isBefore, isToday, startOfDay, subDays } from "date-fns";
 import type { FullTask } from "./routine-data";
-import { cycleDayFor } from "./cycle";
+import { scheduleDayFor } from "./schedule";
 import { supabase } from "@/integrations/supabase/client";
 
 export interface DayEntry {
@@ -13,7 +13,7 @@ export interface DayEntry {
 export async function fetchHabitHistory(
   userId: string,
   ft: FullTask,
-  cycleStart: Date,
+  scheduleStart: Date,
   windowDays = 90,
   startDate?: Date,
 ): Promise<DayEntry[]> {
@@ -31,18 +31,18 @@ export async function fetchHabitHistory(
   const doneSet = new Set((data ?? []).filter((c) => c.done).map((c) => c.date));
 
   const today = new Date();
-  const cycleStartDay = startOfDay(cycleStart);
+  const scheduleStartDay = startOfDay(scheduleStart);
   const entries: DayEntry[] = [];
   for (let i = 0; i < windowDays; i++) {
     const d = startDate ? addDays(firstDate, i) : subDays(today, windowDays - 1 - i);
-    const day = cycleDayFor(d, cycleStart);
-    const sched = ft.schedule.find((s) => s.cycle_day === day);
+    const day = scheduleDayFor(d, scheduleStart);
+    const sched = ft.schedule.find((s) => s.schedule_slot === day);
     const iso = format(d, "yyyy-MM-dd");
-    const isBeforeCycleStart = isBefore(startOfDay(d), cycleStartDay);
+    const isBeforeScheduleStart = isBefore(startOfDay(d), scheduleStartDay);
     entries.push({
       date: d,
       iso,
-      scheduled: !isBeforeCycleStart && !!sched?.variant_id,
+      scheduled: !isBeforeScheduleStart && !!sched?.variant_id,
       done: doneSet.has(iso),
     });
   }

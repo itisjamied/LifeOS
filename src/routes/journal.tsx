@@ -9,7 +9,7 @@ import {
   type AppConfirmDialogConfig,
   type AppTextDialogConfig,
 } from "@/components/ui/app-dialog";
-import { todayISO } from "@/lib/cycle";
+import { todayISO } from "@/lib/schedule";
 import {
   addJournalAttachment,
   createJournalNotePage,
@@ -85,7 +85,7 @@ import { toast } from "sonner";
 export const Route = createFileRoute("/journal")({
   head: () => ({
     meta: [
-      { title: "Journal — Cycle" },
+      { title: "Journal - LifeOS" },
       {
         name: "description",
         content: "Private folders, rich notes, attachments and a monthly journal calendar.",

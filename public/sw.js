@@ -1,4 +1,4 @@
-const CACHE_NAME = "cycle-pwa-v2";
+const CACHE_NAME = "lifeos-pwa-v3";
 const APP_SHELL = [
   "/",
   "/manifest.webmanifest",

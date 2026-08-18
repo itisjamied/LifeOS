@@ -67,7 +67,7 @@ async function runSeed(userId: string): Promise<boolean> {
         {
           user_id: userId,
           task_id: task.id,
-          cycle_day: idx + 1,
+          schedule_slot: idx + 1,
           variant_id: vid,
         },
       ];

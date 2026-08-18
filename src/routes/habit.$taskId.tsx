@@ -25,8 +25,8 @@ const HABIT_DETAIL_WINDOW_DAYS = 28;
 export const Route = createFileRoute("/habit/$taskId")({
   head: () => ({
     meta: [
-      { title: "Habit detail — Cycle" },
-      { name: "description", content: "28-day calendar and streak breakdown for a habit." },
+      { title: "Habit detail - LifeOS" },
+      { name: "description", content: "Habit calendar and streak breakdown." },
     ],
   }),
   component: HabitDetailPage,
@@ -54,8 +54,8 @@ function HabitDetailPage() {
       const found = routine.find((r) => r.task.id === taskId) ?? null;
       setFt(found);
       if (found) {
-        const cs = profile?.cycle_start_date ? parseISO(profile.cycle_start_date) : new Date();
-        const calendarStart = currentCycleStartFor(cs);
+        const cs = profile?.routine_start_date ? parseISO(profile.routine_start_date) : new Date();
+        const calendarStart = currentScheduleWindowStartFor(cs);
         const e = await fetchHabitHistory(
           user.id,
           found,
@@ -129,7 +129,7 @@ function HabitDetailPage() {
 
       <section className="surface mb-5 p-4">
         <h2 className="mb-3 text-xs font-medium uppercase text-muted-foreground">
-          28-day calendar
+          Routine calendar
         </h2>
         <CalendarGrid entries={entries} taskColor={ft.task.color} />
         <div className="mt-3 flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
@@ -180,12 +180,12 @@ function isMeasuredEntry(entry: DayEntry) {
   return !isAfter(entry.date, new Date()) && (!isToday(entry.date) || entry.done);
 }
 
-function currentCycleStartFor(cycleStart: Date) {
-  const firstCycleDay = startOfDay(cycleStart);
+function currentScheduleWindowStartFor(scheduleStart: Date) {
+  const firstScheduleDay = startOfDay(scheduleStart);
   const today = startOfDay(new Date());
-  const daysSinceStart = Math.max(0, differenceInCalendarDays(today, firstCycleDay));
-  const cyclesSinceStart = Math.floor(daysSinceStart / HABIT_DETAIL_WINDOW_DAYS);
-  return addDays(firstCycleDay, cyclesSinceStart * HABIT_DETAIL_WINDOW_DAYS);
+  const daysSinceStart = Math.max(0, differenceInCalendarDays(today, firstScheduleDay));
+  const windowsSinceStart = Math.floor(daysSinceStart / HABIT_DETAIL_WINDOW_DAYS);
+  return addDays(firstScheduleDay, windowsSinceStart * HABIT_DETAIL_WINDOW_DAYS);
 }
 
 function Stat({

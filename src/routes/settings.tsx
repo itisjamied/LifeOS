@@ -17,8 +17,8 @@ import { FileDown, FileText } from "lucide-react";
 export const Route = createFileRoute("/settings")({
   head: () => ({
     meta: [
-      { title: "Settings — Cycle" },
-      { name: "description", content: "Adjust your cycle start date and account." },
+      { title: "Settings - LifeOS" },
+      { name: "description", content: "Adjust your profile and account." },
     ],
   }),
   component: SettingsPage,
@@ -38,7 +38,7 @@ function SettingsPage() {
     if (!user) return;
     fetchProfile(user.id).then((p) => {
       if (p) {
-        setStart(p.cycle_start_date);
+        setStart(p.routine_start_date);
         setName(p.display_name ?? "");
       }
     });
@@ -48,7 +48,7 @@ function SettingsPage() {
     if (!user) return;
     const { error } = await supabase
       .from("profiles")
-      .update({ cycle_start_date: start, display_name: name })
+      .update({ routine_start_date: start, display_name: name })
       .eq("id", user.id);
     if (error) toast.error(error.message);
     else toast.success("Saved");
@@ -70,10 +70,10 @@ function SettingsPage() {
           <Input id="name" value={name} onChange={(e) => setName(e.target.value)} />
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="start">Cycle start date</Label>
+          <Label htmlFor="start">Routine start date</Label>
           <Input id="start" type="date" value={start} onChange={(e) => setStart(e.target.value)} />
           <p className="text-xs text-muted-foreground">
-            Day 1 of your 28-day cycle starts on this date.
+            Your routine schedule is anchored to this date.
           </p>
         </div>
         <Button onClick={save} className="w-full rounded-full">

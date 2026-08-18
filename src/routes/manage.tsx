@@ -28,8 +28,8 @@ import { toast } from "sonner";
 export const Route = createFileRoute("/manage")({
   head: () => ({
     meta: [
-      { title: "Edit routine — Cycle" },
-      { name: "description", content: "Edit your tasks, variants, sub-steps and 28-day schedule." },
+      { title: "Edit routine - LifeOS" },
+      { name: "description", content: "Edit your tasks, variants, sub-steps, and schedule." },
     ],
   }),
   component: ManagePage,
@@ -271,7 +271,7 @@ function ManagePage() {
                   </span>
                   <span className="block truncate text-xs text-muted-foreground">
                     {timeLabel(ft.task.time_of_day)} · {variantCount} variant
-                    {variantCount === 1 ? "" : "s"} · {scheduledDays}/28 days
+                    {variantCount === 1 ? "" : "s"} · {scheduledDays} scheduled
                   </span>
                 </span>
               </button>
@@ -364,7 +364,7 @@ function TaskEditor({
   const [schedule, setSchedule] = useState<Record<number, string | null>>(() => {
     const map: Record<number, string | null> = {};
     for (let d = 1; d <= 28; d++) map[d] = null;
-    for (const s of full.schedule) map[s.cycle_day] = s.variant_id ?? null;
+    for (const s of full.schedule) map[s.schedule_slot] = s.variant_id ?? null;
     return map;
   });
   const [busy, setBusy] = useState(false);
@@ -526,7 +526,7 @@ function TaskEditor({
     setActiveDay(null);
     setDayMenuPosition(null);
     // Find existing schedule row
-    const existing = full.schedule.find((s) => s.cycle_day === day);
+    const existing = full.schedule.find((s) => s.schedule_slot === day);
     if (variantId === null) {
       if (existing) await supabase.from("task_schedule").delete().eq("id", existing.id);
     } else if (existing) {
@@ -541,7 +541,12 @@ function TaskEditor({
     } else {
       const { data, error } = await supabase
         .from("task_schedule")
-        .insert({ user_id: userId, task_id: full.task.id, cycle_day: day, variant_id: variantId })
+        .insert({
+          user_id: userId,
+          task_id: full.task.id,
+          schedule_slot: day,
+          variant_id: variantId,
+        })
         .select("*")
         .single();
       if (error) {
@@ -770,7 +775,7 @@ function TaskEditor({
       {/* Schedule */}
       <section className="mb-5">
         <h2 className="mb-3 text-sm font-semibold uppercase text-muted-foreground">
-          28-day schedule
+          Routine schedule
         </h2>
         <div className="surface p-3">
           <div className="grid grid-cols-7 gap-1.5">

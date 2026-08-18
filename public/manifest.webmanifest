@@ -1,8 +1,8 @@
 {
   "id": "/",
-  "name": "Cycle — 28-Day Routine",
-  "short_name": "Cycle",
-  "description": "A mobile-first 28-day routine tracker for daily care habits.",
+  "name": "LifeOS",
+  "short_name": "LifeOS",
+  "description": "A mobile-first personal system for routines, goals, and journaling.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

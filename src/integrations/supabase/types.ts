@@ -250,45 +250,45 @@ export type Database = {
       profiles: {
         Row: {
           created_at: string;
-          cycle_start_date: string;
           display_name: string | null;
           id: string;
+          routine_start_date: string;
           updated_at: string;
         };
         Insert: {
           created_at?: string;
-          cycle_start_date?: string;
           display_name?: string | null;
           id: string;
+          routine_start_date?: string;
           updated_at?: string;
         };
         Update: {
           created_at?: string;
-          cycle_start_date?: string;
           display_name?: string | null;
           id?: string;
+          routine_start_date?: string;
           updated_at?: string;
         };
         Relationships: [];
       };
       task_schedule: {
         Row: {
-          cycle_day: number;
           id: string;
+          schedule_slot: number;
           task_id: string;
           user_id: string;
           variant_id: string | null;
         };
         Insert: {
-          cycle_day: number;
           id?: string;
+          schedule_slot: number;
           task_id: string;
           user_id: string;
           variant_id?: string | null;
         };
         Update: {
-          cycle_day?: number;
           id?: string;
+          schedule_slot?: number;
           task_id?: string;
           user_id?: string;
           variant_id?: string | null;

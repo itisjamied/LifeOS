@@ -9,7 +9,7 @@ import {
   type FullTask,
   type CompletionRow,
 } from "@/lib/routine-data";
-import { cycleDayFor } from "@/lib/cycle";
+import { scheduleDayFor } from "@/lib/schedule";
 import { glyphFor, colorValue } from "@/lib/symbols";
 import { format, parseISO, addDays, subDays, isToday as isTodayFn, isSameDay } from "date-fns";
 import {
@@ -41,7 +41,7 @@ type TimeFilter = "all" | "am" | "any" | "pm" | "other";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Today — Cycle" },
+      { title: "Today - LifeOS" },
       {
         name: "description",
         content: "Your maintenance routine for today, grouped morning and evening.",
@@ -56,7 +56,7 @@ function TodayPage() {
   const navigate = useNavigate();
   const [routine, setRoutine] = useState<FullTask[] | null>(null);
   const [completions, setCompletions] = useState<CompletionRow[]>([]);
-  const [cycleStart, setCycleStart] = useState<Date | null>(null);
+  const [scheduleStart, setScheduleStart] = useState<Date | null>(null);
   const [busy, setBusy] = useState(true);
   const [openTask, setOpenTask] = useState<string | null>(null);
   const [timeFilter, setTimeFilter] = useState<TimeFilter>("all");
@@ -80,7 +80,9 @@ function TodayPage() {
           fetchProfile(user.id),
         ]);
         setRoutine(data);
-        setCycleStart(profile?.cycle_start_date ? parseISO(profile.cycle_start_date) : new Date());
+        setScheduleStart(
+          profile?.routine_start_date ? parseISO(profile.routine_start_date) : new Date(),
+        );
       } catch (e: unknown) {
         toast.error(e instanceof Error ? e.message : "Failed to load routine");
       } finally {
@@ -101,8 +103,8 @@ function TodayPage() {
   }, [user, viewDateStr]);
 
   const day = useMemo(
-    () => (cycleStart ? cycleDayFor(viewDate, cycleStart) : 1),
-    [cycleStart, viewDate],
+    () => (scheduleStart ? scheduleDayFor(viewDate, scheduleStart) : 1),
+    [scheduleStart, viewDate],
   );
   const isViewingToday = isTodayFn(viewDate);
   const isFuture = viewDate.getTime() > new Date().setHours(23, 59, 59, 999);
@@ -110,7 +112,7 @@ function TodayPage() {
   const todaysTasks = useMemo(() => {
     if (!routine) return [];
     return routine.flatMap((ft): TodayTask[] => {
-      const sched = ft.schedule.find((s) => s.cycle_day === day);
+      const sched = ft.schedule.find((s) => s.schedule_slot === day);
       if (!sched || !sched.variant_id) return [];
       const variant = ft.variants.find((v) => v.id === sched.variant_id);
       if (!variant) return [];
@@ -193,7 +195,7 @@ function TodayPage() {
   if (loading || busy) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center text-muted-foreground">
-        <Sparkles className="mr-2 h-4 w-4 animate-pulse" /> loading your cycle…
+        <Sparkles className="mr-2 h-4 w-4 animate-pulse" /> loading LifeOS...
       </div>
     );
   }
@@ -239,11 +241,10 @@ function TodayPage() {
           }}
           disabled={isViewingToday}
           className="inline-flex min-w-24 items-center justify-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-sm font-bold text-foreground shadow-sm transition-transform active:scale-95 disabled:opacity-100"
-          aria-label={`Cycle day ${day} of 28`}
+          aria-label={`Schedule day ${day}`}
         >
           <span className="pop-dot inline-block h-2 w-2 rounded-full bg-primary" />
-          {day}
-          <span className="text-muted-foreground">/28</span>
+          Day {day}
         </button>
         <button
           type="button"

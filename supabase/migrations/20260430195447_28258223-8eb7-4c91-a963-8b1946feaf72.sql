@@ -3,7 +3,7 @@
 CREATE TABLE public.profiles (
   id UUID PRIMARY KEY REFERENCES auth.users ON DELETE CASCADE,
   display_name TEXT,
-  cycle_start_date DATE NOT NULL DEFAULT CURRENT_DATE,
+  routine_start_date DATE NOT NULL DEFAULT CURRENT_DATE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -38,14 +38,14 @@ CREATE TABLE public.task_variants (
 ALTER TABLE public.task_variants ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "own variants all" ON public.task_variants FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
--- Schedule: which variant is assigned to which day-of-cycle (1..28) for each task
+-- Schedule: which variant is assigned to each recurring slot for each task
 CREATE TABLE public.task_schedule (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   task_id UUID NOT NULL REFERENCES public.tasks ON DELETE CASCADE,
   user_id UUID NOT NULL REFERENCES auth.users ON DELETE CASCADE,
-  cycle_day INT NOT NULL CHECK (cycle_day BETWEEN 1 AND 28),
+  schedule_slot INT NOT NULL CHECK (schedule_slot BETWEEN 1 AND 28),
   variant_id UUID REFERENCES public.task_variants ON DELETE CASCADE,
-  UNIQUE (task_id, cycle_day)
+  UNIQUE (task_id, schedule_slot)
 );
 ALTER TABLE public.task_schedule ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "own schedule all" ON public.task_schedule FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);

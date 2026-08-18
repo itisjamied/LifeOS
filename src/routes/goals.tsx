@@ -38,7 +38,7 @@ import { toast } from "sonner";
 export const Route = createFileRoute("/goals")({
   head: () => ({
     meta: [
-      { title: "Goals — Cycle" },
+      { title: "Goals - LifeOS" },
       {
         name: "description",
         content: "Weekly intentions and daily goals.",
@@ -267,7 +267,7 @@ function GoalsPage() {
       <section className="mt-5">
         <div className="mb-3 flex items-center justify-between px-1">
           <div>
-            <p className="text-xs font-medium uppercase text-muted-foreground">Day 1-7</p>
+            <p className="text-xs font-medium uppercase text-muted-foreground">This week</p>
             <h2 className="mt-1 text-xl text-foreground">Daily three</h2>
           </div>
           <ProgressPill done={dailyProgress.done} total={dailyProgress.total} />

@@ -13,7 +13,7 @@ export const Route = createFileRoute("/auth")({
   head: () => ({
     meta: [
       { title: "LifeOS" },
-      { name: "description", content: "Sign in to track your 28-day routine across devices." },
+      { name: "description", content: "Sign in to manage your routines across devices." },
     ],
   }),
   component: AuthPage,
@@ -65,9 +65,9 @@ function AuthPage() {
           <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground animate-pop">
             <Sparkles className="h-6 w-6" />
           </div>
-          <h1 className="text-3xl text-foreground">Cycle</h1>
+          <h1 className="text-3xl text-foreground">LifeOS</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Your 28-day maintenance routine, on autopilot.
+            Your routines, goals, and journal in one place.
           </p>
         </div>
 

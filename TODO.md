@@ -11,7 +11,7 @@ Tiny completion animation
 When a full task completes: soft pulse, check mark bounce, maybe the row briefly glows. Not too flashy.
 
 Weekly focus view
-A compact “This week” strip on Today showing upcoming heavy/light days. Since your cycle matters, this would be genuinely useful.
+A compact "This week" strip on Today showing upcoming heavy/light days. Since your routine rhythm matters, this would be genuinely useful.
 
 Skipped / paused state
 Sometimes you don’t fail a task, you intentionally skip it. Add “Skip today” so stats can distinguish missed vs skipped.
@@ -21,7 +21,6 @@ Right now symbols are functional, but the whole design is icon-heavy. A better i
 
 Reminder nudges
 Optional Morning / Evening browser notifications. Keep them opt-in and quiet.
-
 
 Dark mode contrast pass
 You’ve already noticed this theme needs tuning. I’d do one intentional pass over dark mode labels, chips, cards, and colored fills before adding too many features.

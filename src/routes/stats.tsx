@@ -13,8 +13,8 @@ const STATS_WINDOW_DAYS = 28;
 export const Route = createFileRoute("/stats")({
   head: () => ({
     meta: [
-      { title: "Progress — Cycle" },
-      { name: "description", content: "Your habit streaks and consistency over the last 28 days." },
+      { title: "Progress - LifeOS" },
+      { name: "description", content: "Your habit streaks and consistency." },
     ],
   }),
   component: StatsPage,
@@ -40,7 +40,7 @@ function StatsPage() {
     (async () => {
       const [rt, profile] = await Promise.all([fetchAllRoutine(user.id), fetchProfile(user.id)]);
       setRoutine(rt);
-      const cs = profile?.cycle_start_date ? parseISO(profile.cycle_start_date) : new Date();
+      const cs = profile?.routine_start_date ? parseISO(profile.routine_start_date) : new Date();
       const s = await computeStats(user.id, rt as FullTask[], cs, STATS_WINDOW_DAYS);
       setStats(s);
     })();
@@ -98,7 +98,7 @@ function StatsPage() {
             <ChevronLeft className="h-[18px] w-[18px]" />
           </Link>
           <div className="text-center">
-            <p className="text-[11px] font-semibold uppercase text-muted-foreground">28 days</p>
+            <p className="text-[11px] font-semibold uppercase text-muted-foreground">Habits</p>
             <h1 className="mt-1 text-3xl text-foreground">Progress</h1>
           </div>
           <ThemeToggle />

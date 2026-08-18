@@ -34,30 +34,27 @@ export const Route = createRootRoute({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
-      { title: "Cycle — your 28-day routine" },
+      { title: "LifeOS" },
       {
         name: "description",
-        content:
-          "Mobile-first 28-day maintenance routine tracker. Wake up, see what's due, check it off.",
+        content: "Mobile-first personal system for routines, goals, and journaling.",
       },
       { name: "theme-color", content: "#eff6fb" },
       { name: "theme-color", content: "#26365f", media: "(prefers-color-scheme: dark)" },
       { name: "color-scheme", content: "light dark" },
       { name: "mobile-web-app-capable", content: "yes" },
       { name: "apple-mobile-web-app-capable", content: "yes" },
-      { name: "apple-mobile-web-app-title", content: "Cycle" },
+      { name: "apple-mobile-web-app-title", content: "LifeOS" },
       { name: "apple-mobile-web-app-status-bar-style", content: "default" },
-      { property: "og:title", content: "Cycle — your 28-day routine" },
-      { name: "twitter:title", content: "Cycle — your 28-day routine" },
+      { property: "og:title", content: "LifeOS" },
+      { name: "twitter:title", content: "LifeOS" },
       {
         property: "og:description",
-        content:
-          "Mobile-first 28-day maintenance routine tracker. Wake up, see what's due, check it off.",
+        content: "Mobile-first personal system for routines, goals, and journaling.",
       },
       {
         name: "twitter:description",
-        content:
-          "Mobile-first 28-day maintenance routine tracker. Wake up, see what's due, check it off.",
+        content: "Mobile-first personal system for routines, goals, and journaling.",
       },
       { name: "twitter:card", content: "summary_large_image" },
       { property: "og:type", content: "website" },

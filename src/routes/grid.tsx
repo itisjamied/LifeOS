@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { fetchAllRoutine, fetchProfile, type FullTask } from "@/lib/routine-data";
-import { cycleDayFor } from "@/lib/cycle";
+import { scheduleDayFor } from "@/lib/schedule";
 import { glyphFor, colorValue } from "@/lib/symbols";
 import { parseISO } from "date-fns";
 import { CalendarDays, ChevronLeft, Sparkles } from "lucide-react";
@@ -11,8 +11,8 @@ import { ThemeToggle } from "@/components/theme-toggle";
 export const Route = createFileRoute("/grid")({
   head: () => ({
     meta: [
-      { title: "Cycle calendar — Cycle" },
-      { name: "description", content: "See the whole 28-day routine at a glance." },
+      { title: "Routine calendar - LifeOS" },
+      { name: "description", content: "See your routine schedule at a glance." },
     ],
   }),
   component: GridPage,
@@ -22,7 +22,7 @@ function GridPage() {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
   const [routine, setRoutine] = useState<FullTask[] | null>(null);
-  const [cycleStart, setCycleStart] = useState<Date | null>(null);
+  const [scheduleStart, setScheduleStart] = useState<Date | null>(null);
 
   useEffect(() => {
     if (!loading && !user) navigate({ to: "/auth" });
@@ -33,13 +33,15 @@ function GridPage() {
     (async () => {
       const [data, profile] = await Promise.all([fetchAllRoutine(user.id), fetchProfile(user.id)]);
       setRoutine(data);
-      setCycleStart(profile?.cycle_start_date ? parseISO(profile.cycle_start_date) : new Date());
+      setScheduleStart(
+        profile?.routine_start_date ? parseISO(profile.routine_start_date) : new Date(),
+      );
     })();
   }, [user]);
 
   const today = useMemo(
-    () => (cycleStart ? cycleDayFor(new Date(), cycleStart) : null),
-    [cycleStart],
+    () => (scheduleStart ? scheduleDayFor(new Date(), scheduleStart) : null),
+    [scheduleStart],
   );
 
   if (!routine) {
@@ -58,7 +60,7 @@ function GridPage() {
             <ChevronLeft className="h-[18px] w-[18px]" />
           </Link>
           <div className="text-center">
-            <p className="text-[11px] font-semibold uppercase text-muted-foreground">28 days</p>
+            <p className="text-[11px] font-semibold uppercase text-muted-foreground">Routine</p>
             <h1 className="mt-1 text-3xl text-foreground">Calendar</h1>
           </div>
           <ThemeToggle />
@@ -69,7 +71,7 @@ function GridPage() {
         <div className="mb-3 flex items-center justify-center gap-2 text-muted-foreground">
           <CalendarDays className="h-4 w-4 text-primary" />
           <span className="text-xs font-bold text-foreground">Day {today ?? 1}</span>
-          <span className="text-xs">/ 28</span>
+          <span className="text-xs">schedule</span>
         </div>
 
         <div className="overflow-x-auto pb-2">
@@ -111,7 +113,7 @@ function GridPage() {
                   <span className="truncate">{ft.task.name}</span>
                 </Link>
                 {Array.from({ length: 28 }, (_, i) => i + 1).map((d) => {
-                  const sched = ft.schedule.find((s) => s.cycle_day === d);
+                  const sched = ft.schedule.find((s) => s.schedule_slot === d);
                   const variant = sched?.variant_id
                     ? ft.variants.find((v) => v.id === sched.variant_id)
                     : null;

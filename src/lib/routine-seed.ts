@@ -1,5 +1,5 @@
-// 28-day pattern encoded from the user's spreadsheet.
-// Each pattern is a 28-length array of variant symbols or null (skip).
+// Recurring routine pattern encoded from the user's spreadsheet.
+// Each pattern is a fixed-length array of variant symbols or null (skip).
 // Symbols: "x" | "dot" | "star" | "bar"
 
 export type VariantSymbol = "x" | "dot" | "star" | "bar";
@@ -15,7 +15,7 @@ export interface SeedTask {
   color: string; // CSS variable token name (e.g. "routine-oral")
   time_of_day: "am" | "pm" | "any";
   variants: SeedVariant[];
-  // 28-length array — variant symbol for each cycle day, or null if not scheduled
+  // Fixed-length array — variant symbol for each schedule slot, or null if not scheduled
   pattern: (VariantSymbol | null)[];
 }
 
@@ -130,7 +130,7 @@ export const SEED_TASKS: SeedTask[] = [
         steps: ["glycolic body treatment", "moisturizer"],
       },
     ],
-    // Pattern from sheet (28 days, alternating-ish):
+    // Pattern from sheet, alternating-ish:
     pattern: [
       "x",
       "dot",
