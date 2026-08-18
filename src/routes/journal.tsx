@@ -136,26 +136,65 @@ const EMPTY_TOOLBAR_STATE: ToolbarState = {
   quote: false,
 };
 
-const TEXT_COLOR_OPTIONS = [
-  { label: "Ink", value: "#111827" },
-  { label: "Gray", value: "#6b7280" },
-  { label: "Red", value: "#dc2626" },
-  { label: "Orange", value: "#ea580c" },
-  { label: "Yellow", value: "#ca8a04" },
-  { label: "Green", value: "#16a34a" },
-  { label: "Blue", value: "#2563eb" },
-  { label: "Purple", value: "#7c3aed" },
-  { label: "Pink", value: "#db2777" },
+type JournalColorOption = {
+  label: string;
+  value: string;
+  light: string;
+  cssVar: string;
+  legacy?: string[];
+};
+
+const TEXT_COLOR_OPTIONS: JournalColorOption[] = [
+  { label: "Ink", value: "ink", light: "#111827", cssVar: "var(--journal-text-ink)" },
+  { label: "Gray", value: "gray", light: "#6b7280", cssVar: "var(--journal-text-gray)" },
+  { label: "Red", value: "red", light: "#dc2626", cssVar: "var(--journal-text-red)" },
+  { label: "Orange", value: "orange", light: "#ea580c", cssVar: "var(--journal-text-orange)" },
+  {
+    label: "Yellow",
+    value: "yellow",
+    light: "#a16207",
+    cssVar: "var(--journal-text-yellow)",
+    legacy: ["#ca8a04"],
+  },
+  { label: "Green", value: "green", light: "#16a34a", cssVar: "var(--journal-text-green)" },
+  { label: "Blue", value: "blue", light: "#2563eb", cssVar: "var(--journal-text-blue)" },
+  { label: "Purple", value: "purple", light: "#7c3aed", cssVar: "var(--journal-text-purple)" },
+  { label: "Pink", value: "pink", light: "#db2777", cssVar: "var(--journal-text-pink)" },
 ];
 
-const HIGHLIGHT_COLOR_OPTIONS = [
-  { label: "Yellow", value: "#fef08a" },
-  { label: "Orange", value: "#fed7aa" },
-  { label: "Green", value: "#bbf7d0" },
-  { label: "Blue", value: "#bfdbfe" },
-  { label: "Purple", value: "#ddd6fe" },
-  { label: "Pink", value: "#fbcfe8" },
+const HIGHLIGHT_COLOR_OPTIONS: JournalColorOption[] = [
+  {
+    label: "Yellow",
+    value: "yellow",
+    light: "#fef08a",
+    cssVar: "var(--journal-highlight-yellow)",
+  },
+  {
+    label: "Orange",
+    value: "orange",
+    light: "#fed7aa",
+    cssVar: "var(--journal-highlight-orange)",
+  },
+  {
+    label: "Green",
+    value: "green",
+    light: "#bbf7d0",
+    cssVar: "var(--journal-highlight-green)",
+  },
+  { label: "Blue", value: "blue", light: "#bfdbfe", cssVar: "var(--journal-highlight-blue)" },
+  {
+    label: "Purple",
+    value: "purple",
+    light: "#ddd6fe",
+    cssVar: "var(--journal-highlight-purple)",
+  },
+  { label: "Pink", value: "pink", light: "#fbcfe8", cssVar: "var(--journal-highlight-pink)" },
 ];
+
+const TEXT_COLOR_BY_KEY = new Map(TEXT_COLOR_OPTIONS.map((option) => [option.value, option]));
+const HIGHLIGHT_COLOR_BY_KEY = new Map(
+  HIGHLIGHT_COLOR_OPTIONS.map((option) => [option.value, option]),
+);
 
 const FONT_SIZE_OPTIONS = [
   { label: "12", value: "12px" },
@@ -1367,18 +1406,29 @@ function JournalPage() {
   };
 
   const applyTextColor = (color: string) => {
-    setFormatMenu(null);
-    runCommand("foreColor", color);
-  };
-
-  const applyHighlightColor = (color: string) => {
+    const option = TEXT_COLOR_BY_KEY.get(color);
+    if (!option) return;
     setFormatMenu(null);
     editorRef.current?.focus();
     restoreEditorSelection();
     document.execCommand("styleWithCSS", false, "true");
-    if (!document.execCommand("hiliteColor", false, color)) {
-      document.execCommand("backColor", false, color);
+    document.execCommand("foreColor", false, option.light);
+    normalizeJournalThemeColors(editorRef.current);
+    handleEditorInput();
+    window.setTimeout(refreshToolbarState, 0);
+  };
+
+  const applyHighlightColor = (color: string) => {
+    const option = HIGHLIGHT_COLOR_BY_KEY.get(color);
+    if (!option) return;
+    setFormatMenu(null);
+    editorRef.current?.focus();
+    restoreEditorSelection();
+    document.execCommand("styleWithCSS", false, "true");
+    if (!document.execCommand("hiliteColor", false, option.light)) {
+      document.execCommand("backColor", false, option.light);
     }
+    normalizeJournalThemeColors(editorRef.current);
     handleEditorInput();
     window.setTimeout(refreshToolbarState, 0);
   };
@@ -2874,8 +2924,11 @@ function MonthlyJournalCalendar({
                   : "border-transparent text-muted-foreground/35"
               } ${today ? "ring-2 ring-primary/40" : ""}`}
               style={{
-                backgroundColor: count === 0 ? "transparent" : `oklch(0.7 0.13 235 / ${intensity})`,
-                color: count > 0 ? "var(--primary-foreground)" : undefined,
+                backgroundColor:
+                  count === 0
+                    ? "transparent"
+                    : `oklch(var(--journal-calendar-activity) / ${intensity})`,
+                color: count > 0 ? "var(--journal-calendar-activity-foreground)" : undefined,
               }}
             >
               {format(item.date, "d")}
@@ -3098,7 +3151,7 @@ function ToolbarFormatMenu({
               >
                 <span
                   className="h-5 w-5 rounded-full border border-black/10"
-                  style={{ backgroundColor: option.value }}
+                  style={{ backgroundColor: option.cssVar }}
                   aria-hidden
                 />
               </button>
@@ -3307,6 +3360,7 @@ function renderInlineAttachments(
   template.innerHTML = ensureInlineAttachmentEmbeds(html, attachments);
   hydrateChecklists(template.content);
   hydrateInlineAttachments(template.content, attachments, urls);
+  normalizeJournalThemeColors(template.content);
   ensureEditableBreaksAfterBlocks(template.content);
   return template.innerHTML;
 }
@@ -3333,6 +3387,7 @@ function serializeEditorHtml(html: string) {
   const template = document.createElement("template");
   template.innerHTML = cleanHtml;
   hydrateChecklists(template.content);
+  normalizeJournalThemeColors(template.content);
   template.content.querySelectorAll("[data-journal-attachment-id]").forEach((node) => {
     const element = node as HTMLElement;
     const attachment = attachmentFromElement(element);
@@ -3345,6 +3400,84 @@ function serializeEditorHtml(html: string) {
   });
   ensureEditableBreaksAfterBlocks(template.content);
   return template.innerHTML;
+}
+
+function normalizeJournalThemeColors(root: ParentNode | null) {
+  if (!root) return;
+
+  root.querySelectorAll<HTMLElement>("font[color]").forEach((element) => {
+    const key = journalColorKeyFor(element.getAttribute("color") ?? "", TEXT_COLOR_OPTIONS);
+    if (key) {
+      element.dataset.journalTextColor = key;
+      element.removeAttribute("color");
+    }
+  });
+
+  root.querySelectorAll<HTMLElement>("[style]").forEach((element) => {
+    const textColor = journalColorKeyFor(element.style.color, TEXT_COLOR_OPTIONS);
+    if (textColor) {
+      element.dataset.journalTextColor = textColor;
+      element.style.color = "";
+    }
+
+    const highlightColor = journalColorKeyFor(
+      element.style.backgroundColor,
+      HIGHLIGHT_COLOR_OPTIONS,
+    );
+    if (highlightColor) {
+      element.dataset.journalHighlightColor = highlightColor;
+      element.style.backgroundColor = "";
+    }
+
+    if (!element.getAttribute("style")?.trim()) element.removeAttribute("style");
+  });
+}
+
+function journalColorKeyFor(value: string, options: JournalColorOption[]) {
+  const normalized = normalizeCssColorValue(value);
+  if (!normalized) return null;
+  return (
+    options.find((option) =>
+      [
+        option.light,
+        ...(option.legacy ?? []),
+        hexToRgb(option.light),
+        ...(option.legacy ?? []).map(hexToRgb),
+      ]
+        .map(normalizeCssColorValue)
+        .includes(normalized),
+    )?.value ?? null
+  );
+}
+
+function normalizeCssColorValue(value: string) {
+  const trimmed = value.trim().toLowerCase();
+  if (!trimmed) return "";
+  if (trimmed.startsWith("#")) {
+    if (trimmed.length === 4) {
+      return `#${trimmed[1]}${trimmed[1]}${trimmed[2]}${trimmed[2]}${trimmed[3]}${trimmed[3]}`;
+    }
+    return trimmed;
+  }
+
+  const rgb = trimmed.match(/^rgba?\(([^)]+)\)$/);
+  if (!rgb) return trimmed.replace(/\s+/g, "");
+  return `rgb(${rgb[1]
+    .split(",")
+    .slice(0, 3)
+    .map((part) => String(Number.parseInt(part.trim(), 10)))
+    .join(",")})`;
+}
+
+function hexToRgb(hex: string) {
+  const normalized = normalizeCssColorValue(hex);
+  const match = normalized.match(/^#([0-9a-f]{6})$/);
+  if (!match) return normalized;
+  const value = match[1];
+  return `rgb(${Number.parseInt(value.slice(0, 2), 16)},${Number.parseInt(
+    value.slice(2, 4),
+    16,
+  )},${Number.parseInt(value.slice(4, 6), 16)})`;
 }
 
 function ensureEditableBreaksAfterBlocks(root: ParentNode | null) {

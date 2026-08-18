@@ -3,7 +3,6 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import {
   fetchAllRoutine,
-  fetchCompletionsForDate,
   fetchProfile,
   type CompletionRow,
   type FullTask,
@@ -12,8 +11,8 @@ import { fetchWeeklyGoals, WEEK_DAY_KEYS, type GoalItem, type WeekDayKey } from 
 import { supabase } from "@/integrations/supabase/client";
 import { scheduleDayFor, todayISO } from "@/lib/schedule";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { format, parseISO, startOfWeek } from "date-fns";
-import { ArrowRight, BookOpen, Check, ListChecks, Settings, Sparkles, Target } from "lucide-react";
+import { addDays, format, parseISO, startOfWeek } from "date-fns";
+import { BookOpen, Check, ListChecks, Sparkles, Target } from "lucide-react";
 import { toast } from "sonner";
 
 type ScoreSlice = {
@@ -24,7 +23,6 @@ type ScoreSlice = {
   total: number;
   color: string;
   href: "/" | "/today" | "/journal" | "/goals";
-  action: string;
   detail: string;
   icon: React.ReactNode;
 };
@@ -33,7 +31,21 @@ type DailyScore = {
   score: number;
   dateLabel: string;
   slices: ScoreSlice[];
-  bestAction: ScoreSlice;
+  weekScores: WeekScoreDay[];
+};
+
+type WeekScoreDay = {
+  iso: string;
+  label: string;
+  dayLabel: string;
+  score: number | null;
+  isToday: boolean;
+};
+
+type JournalPageSummary = {
+  heading: string | null;
+  content_text: string | null;
+  entry_date: string | null;
 };
 
 export const Route = createFileRoute("/")({
@@ -68,69 +80,56 @@ function HomePage() {
       try {
         const today = new Date();
         const todayKey = todayISO(today);
-        const weekStart = format(startOfWeek(today, { weekStartsOn: 1 }), "yyyy-MM-dd");
-        const [{ routine, completions, profile }, journalPages, weeklyGoals] = await Promise.all([
-          fetchRoutineState(user.id, today, todayKey),
-          fetchJournalPagesForDate(user.id, todayKey),
-          fetchWeeklyGoals(user.id, weekStart),
-        ]);
+        const weekStartDate = startOfWeek(today, { weekStartsOn: 1 });
+        const weekDates = Array.from({ length: 7 }, (_, index) => addDays(weekStartDate, index));
+        const weekStart = todayISO(weekStartDate);
+        const weekEnd = todayISO(addDays(weekStartDate, 6));
+        const [{ routine, completionsByDate, profile }, journalPagesByDate, weeklyGoals] =
+          await Promise.all([
+            fetchRoutineWeekState(user.id, weekStart, weekEnd),
+            fetchJournalPagesForDateRange(user.id, weekStart, weekEnd),
+            fetchWeeklyGoals(user.id, weekStart),
+          ]);
 
         if (cancelled) return;
 
-        const habitProgress = routineProgress(routine, completions, profile, today);
-        const journalProgress = journalPages.some(hasJournalContent) ? 1 : 0;
-        const todaysGoals = weeklyGoals.dailyGoals[weekDayKey(today)];
-        const goalProgress = goalsProgress(todaysGoals);
-        const slices: ScoreSlice[] = [
-          {
-            key: "habits",
-            label: "Habits",
-            value: habitProgress.percent,
-            done: habitProgress.done,
-            total: habitProgress.total,
-            color: "var(--routine-oral)",
-            href: "/today",
-            action: habitProgress.total === 0 ? "View routines" : "Complete habits",
-            detail:
-              habitProgress.total === 0
-                ? "No habits scheduled"
-                : `${habitProgress.done}/${habitProgress.total} complete`,
-            icon: <ListChecks className="h-4 w-4" />,
-          },
-          {
-            key: "journal",
-            label: "Journal",
-            value: journalProgress * 100,
-            done: journalProgress,
-            total: 1,
-            color: "var(--routine-makeup)",
-            href: "/journal",
-            action: journalProgress ? "Open journal" : "Write entry",
-            detail: journalProgress ? "Entry found" : "No entry yet",
-            icon: <BookOpen className="h-4 w-4" />,
-          },
-          {
-            key: "goals",
-            label: "Goals",
-            value: goalProgress.percent,
-            done: goalProgress.done,
-            total: goalProgress.total,
-            color: "var(--routine-skin-pm)",
-            href: "/goals",
-            action: goalProgress.done >= goalProgress.total ? "Review goals" : "Check goals",
-            detail: `${goalProgress.done}/${goalProgress.total} checked`,
-            icon: <Target className="h-4 w-4" />,
-          },
-        ];
-        const score = Math.round(
-          slices.reduce((total, slice) => total + slice.value, 0) / slices.length,
-        );
+        const slices = buildScoreSlices({
+          routine,
+          completions: completionsByDate.get(todayKey) ?? [],
+          profile,
+          date: today,
+          journalPages: journalPagesByDate.get(todayKey) ?? [],
+          dailyGoals: weeklyGoals.dailyGoals[weekDayKey(today)],
+        });
+        const score = scoreFromSlices(slices);
+        const weekScores = weekDates.map((date) => {
+          const iso = todayISO(date);
+          const isFuture = iso > todayKey;
+          const daySlices = isFuture
+            ? null
+            : buildScoreSlices({
+                routine,
+                completions: completionsByDate.get(iso) ?? [],
+                profile,
+                date,
+                journalPages: journalPagesByDate.get(iso) ?? [],
+                dailyGoals: weeklyGoals.dailyGoals[weekDayKey(date)],
+              });
+
+          return {
+            iso,
+            label: format(date, "EEE").slice(0, 1),
+            dayLabel: format(date, "EEE, MMM d"),
+            score: daySlices ? scoreFromSlices(daySlices) : null,
+            isToday: iso === todayKey,
+          };
+        });
 
         setSummary({
           score,
           dateLabel: format(today, "EEEE, MMM d"),
           slices,
-          bestAction: [...slices].sort((a, b) => a.value - b.value)[0],
+          weekScores,
         });
       } catch (error) {
         toast.error(error instanceof Error ? error.message : "Failed to load today");
@@ -155,42 +154,22 @@ function HomePage() {
   return (
     <div className="px-5 pt-8 animate-fade-up">
       <header className="mb-6">
-        <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3">
-          <div className="h-full flex flex-col justify-center">
-            <Link to="/settings" className="icon-button" aria-label="Settings" title="Settings">
-              <Settings className="h-[18px] w-[18px]" />
-            </Link>
-          </div>
-          <div className="text-center">
+        <div className="flex items-center justify-between gap-3">
+          <div>
             <p className="text-[11px] font-semibold uppercase text-muted-foreground">
               {summary.dateLabel}
             </p>
             <h1 className="mt-1 text-3xl text-foreground">LifeOS</h1>
           </div>
-          <div className="flex h-full items-center justify-end">
-            <ThemeToggle />
-          </div>
+          <ThemeToggle />
         </div>
       </header>
 
       <section className="surface p-5">
         <div className="flex flex-col items-center gap-5 lg:flex-row lg:justify-center">
           <ScoreRings score={summary.score} slices={summary.slices} />
-          <div className="w-full max-w-sm space-y-3">
-            <p className="text-xs font-black uppercase text-muted-foreground">Daily score</p>
-            <h2 className="text-2xl text-foreground">{scoreMessage(summary.score)}</h2>
-            <p className="text-sm text-muted-foreground">
-              {summary.bestAction.value >= 100
-                ? "Everything is closed out for today."
-                : `${summary.bestAction.label} is the next area to move.`}
-            </p>
-            <Link
-              to={summary.bestAction.href}
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-primary px-4 text-sm font-bold text-primary-foreground shadow transition-transform active:scale-95"
-            >
-              {summary.bestAction.action}
-              <ArrowRight className="h-4 w-4" />
-            </Link>
+          <div className="w-full max-w-sm">
+            <WeeklyScoreHeatmap days={summary.weekScores} />
           </div>
         </div>
       </section>
@@ -204,24 +183,121 @@ function HomePage() {
   );
 }
 
-async function fetchRoutineState(userId: string, today: Date, todayKey: string) {
+async function fetchRoutineWeekState(userId: string, weekStart: string, weekEnd: string) {
   const [routine, completions, profile] = await Promise.all([
     fetchAllRoutine(userId),
-    fetchCompletionsForDate(userId, todayKey),
+    fetchCompletionsForDateRange(userId, weekStart, weekEnd),
     fetchProfile(userId),
   ]);
-  return { routine, completions, profile, today };
+  return { routine, completionsByDate: groupCompletionsByDate(completions), profile };
 }
 
-async function fetchJournalPagesForDate(userId: string, date: string) {
+async function fetchCompletionsForDateRange(userId: string, startDate: string, endDate: string) {
   const { data, error } = await supabase
-    .from("journal_note_pages")
-    .select("id, heading, content_text")
+    .from("completions")
+    .select("*")
     .eq("user_id", userId)
-    .eq("entry_date", date);
+    .gte("date", startDate)
+    .lte("date", endDate);
 
   if (error) throw error;
   return data ?? [];
+}
+
+async function fetchJournalPagesForDateRange(userId: string, startDate: string, endDate: string) {
+  const { data, error } = await supabase
+    .from("journal_note_pages")
+    .select("id, heading, content_text, entry_date")
+    .eq("user_id", userId)
+    .gte("entry_date", startDate)
+    .lte("entry_date", endDate);
+
+  if (error) throw error;
+  return groupJournalPagesByDate(data ?? []);
+}
+
+function buildScoreSlices({
+  routine,
+  completions,
+  profile,
+  date,
+  journalPages,
+  dailyGoals,
+}: {
+  routine: FullTask[];
+  completions: CompletionRow[];
+  profile: Awaited<ReturnType<typeof fetchProfile>>;
+  date: Date;
+  journalPages: JournalPageSummary[];
+  dailyGoals: GoalItem[];
+}) {
+  const habitProgress = routineProgress(routine, completions, profile, date);
+  const journalProgress = journalPages.some(hasJournalContent) ? 1 : 0;
+  const goalProgress = goalsProgress(dailyGoals);
+
+  return [
+    {
+      key: "habits",
+      label: "Habits",
+      value: habitProgress.percent,
+      done: habitProgress.done,
+      total: habitProgress.total,
+      color: "var(--routine-oral)",
+      href: "/today",
+      detail:
+        habitProgress.total === 0
+          ? "No habits scheduled"
+          : `${habitProgress.done}/${habitProgress.total} complete`,
+      icon: <ListChecks className="h-4 w-4" />,
+    },
+    {
+      key: "journal",
+      label: "Journal",
+      value: journalProgress * 100,
+      done: journalProgress,
+      total: 1,
+      color: "var(--routine-makeup)",
+      href: "/journal",
+      detail: journalProgress ? "Entry found" : "No entry yet",
+      icon: <BookOpen className="h-4 w-4" />,
+    },
+    {
+      key: "goals",
+      label: "Goals",
+      value: goalProgress.percent,
+      done: goalProgress.done,
+      total: goalProgress.total,
+      color: "var(--routine-skin-pm)",
+      href: "/goals",
+      detail: `${goalProgress.done}/${goalProgress.total} checked`,
+      icon: <Target className="h-4 w-4" />,
+    },
+  ] satisfies ScoreSlice[];
+}
+
+function scoreFromSlices(slices: ScoreSlice[]) {
+  return Math.round(slices.reduce((total, slice) => total + slice.value, 0) / slices.length);
+}
+
+function groupCompletionsByDate(completions: CompletionRow[]) {
+  const byDate = new Map<string, CompletionRow[]>();
+  completions.forEach((completion) => {
+    const dayCompletions = byDate.get(completion.date) ?? [];
+    dayCompletions.push(completion);
+    byDate.set(completion.date, dayCompletions);
+  });
+  return byDate;
+}
+
+function groupJournalPagesByDate(pages: JournalPageSummary[]) {
+  const byDate = new Map<string, JournalPageSummary[]>();
+  pages.forEach((page) => {
+    if (!page.entry_date) return;
+    const dayPages = byDate.get(page.entry_date) ?? [];
+    dayPages.push(page);
+    byDate.set(page.entry_date, dayPages);
+  });
+  return byDate;
 }
 
 function routineProgress(
@@ -263,13 +339,6 @@ function hasJournalContent(page: { heading: string | null; content_text: string 
 
 function weekDayKey(date: Date): WeekDayKey {
   return WEEK_DAY_KEYS[(date.getDay() + 6) % 7];
-}
-
-function scoreMessage(score: number) {
-  if (score >= 95) return "Today is complete";
-  if (score >= 70) return "Nearly there";
-  if (score >= 40) return "In progress";
-  return "Start with one thing";
 }
 
 function ScoreRings({ score, slices }: { score: number; slices: ScoreSlice[] }) {
@@ -318,10 +387,64 @@ function ScoreRings({ score, slices }: { score: number; slices: ScoreSlice[] }) 
   );
 }
 
+function WeeklyScoreHeatmap({ days }: { days: WeekScoreDay[] }) {
+  return (
+    <div>
+      <div className="mb-2">
+        <p className="text-[11px] font-black uppercase text-muted-foreground">This week</p>
+      </div>
+      <div className="grid grid-cols-7 gap-1.5">
+        {days.map((day) => {
+          const title =
+            day.score === null
+              ? `${day.dayLabel}: not scored yet`
+              : `${day.dayLabel}: ${day.score}`;
+
+          return (
+            <div key={day.iso} className="min-w-0 text-center">
+              <p className="mb-1 text-[10px] font-black uppercase text-muted-foreground">
+                {day.label}
+              </p>
+              <div
+                role="img"
+                aria-label={title}
+                title={title}
+                className={`mx-auto aspect-square w-full max-w-10 rounded-md border transition-colors ${
+                  day.isToday ? "ring-2 ring-primary/40" : ""
+                } ${day.score === null ? "border-border bg-muted/35" : "border-transparent"}`}
+                style={
+                  day.score === null
+                    ? undefined
+                    : {
+                        backgroundColor: `oklch(var(--score-heatmap) / ${heatmapOpacity(
+                          day.score,
+                        )})`,
+                      }
+                }
+              />
+              <p
+                className={`mt-1 text-[10px] font-black leading-none ${
+                  day.score === null ? "text-muted-foreground/50" : "text-foreground"
+                }`}
+              >
+                {day.score ?? "--"}
+              </p>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function ScoreCard({ slice }: { slice: ScoreSlice }) {
   const complete = slice.value >= 100;
   return (
-    <article className="surface overflow-hidden p-4">
+    <Link
+      to={slice.href}
+      aria-label={`${slice.label}: ${slice.detail}`}
+      className="surface group block overflow-hidden p-4 transition-transform active:scale-[0.99]"
+    >
       <div className="mb-4 flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
           <span
@@ -344,13 +467,10 @@ function ScoreCard({ slice }: { slice: ScoreSlice }) {
           style={{ width: `${slice.value}%`, backgroundColor: slice.color }}
         />
       </div>
-      <Link
-        to={slice.href}
-        className="mt-4 flex h-10 items-center justify-center gap-2 rounded-full border border-border bg-background/70 px-3 text-sm font-bold text-foreground transition-colors hover:bg-muted"
-      >
-        {slice.action}
-        <ArrowRight className="h-4 w-4" />
-      </Link>
-    </article>
+    </Link>
   );
+}
+
+function heatmapOpacity(score: number) {
+  return 0.18 + (Math.max(0, Math.min(score, 100)) / 100) * 0.72;
 }

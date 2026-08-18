@@ -93,6 +93,26 @@
   --routine-floss: oklch(0.72 0.14 285);
   --routine-skin-pm: oklch(0.75 0.15 145);
   --routine-nails: oklch(0.78 0.16 55);
+  --score-heatmap: 0.72 0.14 170;
+
+  --journal-text-ink: oklch(0.22 0.04 265);
+  --journal-text-gray: oklch(0.47 0.03 265);
+  --journal-text-red: oklch(0.55 0.18 25);
+  --journal-text-orange: oklch(0.58 0.16 55);
+  --journal-text-yellow: oklch(0.53 0.13 80);
+  --journal-text-green: oklch(0.52 0.14 145);
+  --journal-text-blue: oklch(0.55 0.15 245);
+  --journal-text-purple: oklch(0.55 0.15 305);
+  --journal-text-pink: oklch(0.56 0.17 345);
+
+  --journal-highlight-yellow: oklch(0.92 0.11 92);
+  --journal-highlight-orange: oklch(0.91 0.09 58);
+  --journal-highlight-green: oklch(0.9 0.09 145);
+  --journal-highlight-blue: oklch(0.89 0.08 235);
+  --journal-highlight-purple: oklch(0.89 0.08 305);
+  --journal-highlight-pink: oklch(0.91 0.08 345);
+  --journal-calendar-activity: 0.7 0.13 235;
+  --journal-calendar-activity-foreground: oklch(0.22 0.04 265);
 }
 
 .dark {
@@ -135,6 +155,26 @@
   --routine-floss: oklch(0.76 0.14 285);
   --routine-skin-pm: oklch(0.78 0.15 145);
   --routine-nails: oklch(0.8 0.16 55);
+  --score-heatmap: 0.78 0.13 145;
+
+  --journal-text-ink: oklch(0.94 0.012 245);
+  --journal-text-gray: oklch(0.75 0.035 245);
+  --journal-text-red: oklch(0.78 0.15 25);
+  --journal-text-orange: oklch(0.8 0.14 55);
+  --journal-text-yellow: oklch(0.86 0.13 92);
+  --journal-text-green: oklch(0.82 0.13 145);
+  --journal-text-blue: oklch(0.8 0.12 235);
+  --journal-text-purple: oklch(0.82 0.12 305);
+  --journal-text-pink: oklch(0.82 0.13 345);
+
+  --journal-highlight-yellow: oklch(0.42 0.09 92);
+  --journal-highlight-orange: oklch(0.42 0.09 58);
+  --journal-highlight-green: oklch(0.4 0.08 145);
+  --journal-highlight-blue: oklch(0.4 0.08 235);
+  --journal-highlight-purple: oklch(0.4 0.08 305);
+  --journal-highlight-pink: oklch(0.42 0.08 345);
+  --journal-calendar-activity: 0.76 0.13 220;
+  --journal-calendar-activity-foreground: oklch(0.96 0.012 245);
 }
 
 @layer base {
@@ -236,6 +276,58 @@
     opacity: 0.18;
     filter: blur(6px);
     z-index: -1;
+  }
+
+  .journal-editor [data-journal-text-color="ink"] {
+    color: var(--journal-text-ink) !important;
+  }
+  .journal-editor [data-journal-text-color="gray"] {
+    color: var(--journal-text-gray) !important;
+  }
+  .journal-editor [data-journal-text-color="red"] {
+    color: var(--journal-text-red) !important;
+  }
+  .journal-editor [data-journal-text-color="orange"] {
+    color: var(--journal-text-orange) !important;
+  }
+  .journal-editor [data-journal-text-color="yellow"] {
+    color: var(--journal-text-yellow) !important;
+  }
+  .journal-editor [data-journal-text-color="green"] {
+    color: var(--journal-text-green) !important;
+  }
+  .journal-editor [data-journal-text-color="blue"] {
+    color: var(--journal-text-blue) !important;
+  }
+  .journal-editor [data-journal-text-color="purple"] {
+    color: var(--journal-text-purple) !important;
+  }
+  .journal-editor [data-journal-text-color="pink"] {
+    color: var(--journal-text-pink) !important;
+  }
+
+  .journal-editor [data-journal-highlight-color] {
+    border-radius: 0.25em;
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+  }
+  .journal-editor [data-journal-highlight-color="yellow"] {
+    background-color: var(--journal-highlight-yellow) !important;
+  }
+  .journal-editor [data-journal-highlight-color="orange"] {
+    background-color: var(--journal-highlight-orange) !important;
+  }
+  .journal-editor [data-journal-highlight-color="green"] {
+    background-color: var(--journal-highlight-green) !important;
+  }
+  .journal-editor [data-journal-highlight-color="blue"] {
+    background-color: var(--journal-highlight-blue) !important;
+  }
+  .journal-editor [data-journal-highlight-color="purple"] {
+    background-color: var(--journal-highlight-purple) !important;
+  }
+  .journal-editor [data-journal-highlight-color="pink"] {
+    background-color: var(--journal-highlight-pink) !important;
   }
 }
 
