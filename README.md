@@ -77,6 +77,7 @@ src/
     journal.tsx
     manage.tsx
     settings.tsx
+    today.tsx
   routeTree.gen.ts
   router.tsx
   styles.css
@@ -87,7 +88,8 @@ src/
 | Route            | File                           | Purpose                                                                                                                  |
 | ---------------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
 | `/auth`          | `src/routes/auth.tsx`          | Email/password signup and signin with Supabase Auth.                                                                     |
-| `/`              | `src/routes/index.tsx`         | Today view. Computes the active schedule slot, lists scheduled tasks by time of day, and upserts completions.            |
+| `/`              | `src/routes/index.tsx`         | Daily score dashboard for habits, journaling, and goals with ring-style progress and completion links.                   |
+| `/today`         | `src/routes/today.tsx`         | Routine checklist. Computes the active schedule slot, lists scheduled tasks by time of day, and upserts completions.     |
 | `/grid`          | `src/routes/grid.tsx`          | Routine calendar showing which variant is scheduled for each task and slot.                                              |
 | `/stats`         | `src/routes/stats.tsx`         | Progress view with current streak, best streak, and consistency.                                                         |
 | `/habit/$taskId` | `src/routes/habit.$taskId.tsx` | Individual habit detail with calendar and streak runs.                                                                   |
@@ -160,6 +162,7 @@ Migrations live in `supabase/migrations` and create:
 
 Examples:
 
+- Home view combines habit completions, today's journal activity, and today's goals into the daily LifeOS score.
 - Today view fetches routine rows plus the user's profile, computes the current schedule slot, then loads completions for the selected date.
 - Checking a task step optimistically updates local state and upserts into `completions`.
 - Manage view edits `tasks`, `task_variants`, and `task_schedule`.

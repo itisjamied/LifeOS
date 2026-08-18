@@ -10,7 +10,7 @@ import { useEffect } from "react";
 import appCss from "../styles.css?url";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { Toaster } from "@/components/ui/sonner";
-import { BookOpen, ListChecks, Settings, Target } from "lucide-react";
+import { BookOpen, House, Settings, Target } from "lucide-react";
 
 function NotFoundComponent() {
   return (
@@ -106,8 +106,9 @@ function BottomNav() {
   const { user } = useAuth();
   const path = useRouterState({ select: (s) => s.location.pathname });
   if (!user) return null;
-  const isTodayArea =
+  const isHomeArea =
     path === "/" ||
+    path === "/today" ||
     path === "/grid" ||
     path === "/stats" ||
     path === "/manage" ||
@@ -139,7 +140,7 @@ function BottomNav() {
       style={{ bottom: "calc(1rem + env(safe-area-inset-bottom))" }}
     >
       <div className="mx-auto flex max-w-md">
-        {tab("/", <ListChecks className="h-5 w-5" />, "Today", isTodayArea)}
+        {tab("/", <House className="h-5 w-5" />, "Home", isHomeArea)}
         {tab("/goals", <Target className="h-5 w-5" />, "Goals")}
         {tab("/journal", <BookOpen className="h-5 w-5" />, "Journal")}
         {tab("/settings", <Settings className="h-5 w-5" />, "Settings")}

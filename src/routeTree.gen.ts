@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as TodayRouteImport } from './routes/today'
 import { Route as StatsRouteImport } from './routes/stats'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ManageRouteImport } from './routes/manage'
@@ -19,6 +20,11 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as HabitTaskIdRouteImport } from './routes/habit.$taskId'
 
+const TodayRoute = TodayRouteImport.update({
+  id: '/today',
+  path: '/today',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const StatsRoute = StatsRouteImport.update({
   id: '/stats',
   path: '/stats',
@@ -74,6 +80,7 @@ export interface FileRoutesByFullPath {
   '/manage': typeof ManageRoute
   '/settings': typeof SettingsRoute
   '/stats': typeof StatsRoute
+  '/today': typeof TodayRoute
   '/habit/$taskId': typeof HabitTaskIdRoute
 }
 export interface FileRoutesByTo {
@@ -85,6 +92,7 @@ export interface FileRoutesByTo {
   '/manage': typeof ManageRoute
   '/settings': typeof SettingsRoute
   '/stats': typeof StatsRoute
+  '/today': typeof TodayRoute
   '/habit/$taskId': typeof HabitTaskIdRoute
 }
 export interface FileRoutesById {
@@ -97,6 +105,7 @@ export interface FileRoutesById {
   '/manage': typeof ManageRoute
   '/settings': typeof SettingsRoute
   '/stats': typeof StatsRoute
+  '/today': typeof TodayRoute
   '/habit/$taskId': typeof HabitTaskIdRoute
 }
 export interface FileRouteTypes {
@@ -110,6 +119,7 @@ export interface FileRouteTypes {
     | '/manage'
     | '/settings'
     | '/stats'
+    | '/today'
     | '/habit/$taskId'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -121,6 +131,7 @@ export interface FileRouteTypes {
     | '/manage'
     | '/settings'
     | '/stats'
+    | '/today'
     | '/habit/$taskId'
   id:
     | '__root__'
@@ -132,6 +143,7 @@ export interface FileRouteTypes {
     | '/manage'
     | '/settings'
     | '/stats'
+    | '/today'
     | '/habit/$taskId'
   fileRoutesById: FileRoutesById
 }
@@ -144,11 +156,19 @@ export interface RootRouteChildren {
   ManageRoute: typeof ManageRoute
   SettingsRoute: typeof SettingsRoute
   StatsRoute: typeof StatsRoute
+  TodayRoute: typeof TodayRoute
   HabitTaskIdRoute: typeof HabitTaskIdRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/today': {
+      id: '/today'
+      path: '/today'
+      fullPath: '/today'
+      preLoaderRoute: typeof TodayRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/stats': {
       id: '/stats'
       path: '/stats'
@@ -224,6 +244,7 @@ const rootRouteChildren: RootRouteChildren = {
   ManageRoute: ManageRoute,
   SettingsRoute: SettingsRoute,
   StatsRoute: StatsRoute,
+  TodayRoute: TodayRoute,
   HabitTaskIdRoute: HabitTaskIdRoute,
 }
 export const routeTree = rootRouteImport

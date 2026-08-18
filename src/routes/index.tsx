@@ -1,70 +1,59 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { supabase } from "@/integrations/supabase/client";
 import {
   fetchAllRoutine,
   fetchCompletionsForDate,
   fetchProfile,
-  type FullTask,
   type CompletionRow,
+  type FullTask,
 } from "@/lib/routine-data";
-import { scheduleDayFor } from "@/lib/schedule";
-import { glyphFor, colorValue } from "@/lib/symbols";
-import { format, parseISO, addDays, subDays, isToday as isTodayFn, isSameDay } from "date-fns";
-import {
-  Check,
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  CalendarDays,
-  CircleDashed,
-  Flame,
-  Plus,
-  Pencil,
-  Sparkles,
-  Sun,
-  Moon,
-  UserRound,
-} from "lucide-react";
+import { fetchWeeklyGoals, WEEK_DAY_KEYS, type GoalItem, type WeekDayKey } from "@/lib/goals-data";
+import { supabase } from "@/integrations/supabase/client";
+import { scheduleDayFor, todayISO } from "@/lib/schedule";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { format, parseISO, startOfWeek } from "date-fns";
+import { ArrowRight, BookOpen, Check, ListChecks, Settings, Sparkles, Target } from "lucide-react";
 import { toast } from "sonner";
 
-type TodayTask = {
-  task: FullTask["task"];
-  variant: FullTask["variants"][number];
-  completion?: CompletionRow;
+type ScoreSlice = {
+  key: "habits" | "journal" | "goals";
+  label: string;
+  value: number;
+  done: number;
+  total: number;
+  color: string;
+  href: "/" | "/today" | "/journal" | "/goals";
+  action: string;
+  detail: string;
+  icon: React.ReactNode;
 };
 
-type TimeFilter = "all" | "am" | "any" | "pm" | "other";
+type DailyScore = {
+  score: number;
+  dateLabel: string;
+  slices: ScoreSlice[];
+  bestAction: ScoreSlice;
+};
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Today - LifeOS" },
+      { title: "Home - LifeOS" },
       {
         name: "description",
-        content: "Your maintenance routine for today, grouped morning and evening.",
+        content: "Your daily LifeOS score across routines, goals, and journaling.",
       },
     ],
   }),
-  component: TodayPage,
+  component: HomePage,
 });
 
-function TodayPage() {
+function HomePage() {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
-  const [routine, setRoutine] = useState<FullTask[] | null>(null);
-  const [completions, setCompletions] = useState<CompletionRow[]>([]);
-  const [scheduleStart, setScheduleStart] = useState<Date | null>(null);
+  const [summary, setSummary] = useState<DailyScore | null>(null);
   const [busy, setBusy] = useState(true);
-  const [openTask, setOpenTask] = useState<string | null>(null);
-  const [timeFilter, setTimeFilter] = useState<TimeFilter>("all");
-  const [viewDate, setViewDate] = useState<Date>(() => {
-    const d = new Date();
-    d.setHours(0, 0, 0, 0);
-    return d;
-  });
 
   useEffect(() => {
     if (!loading && !user) navigate({ to: "/auth" });
@@ -72,127 +61,90 @@ function TodayPage() {
 
   useEffect(() => {
     if (!user) return;
+    let cancelled = false;
+
     (async () => {
       setBusy(true);
       try {
-        const [data, profile] = await Promise.all([
-          fetchAllRoutine(user.id),
-          fetchProfile(user.id),
+        const today = new Date();
+        const todayKey = todayISO(today);
+        const weekStart = format(startOfWeek(today, { weekStartsOn: 1 }), "yyyy-MM-dd");
+        const [{ routine, completions, profile }, journalPages, weeklyGoals] = await Promise.all([
+          fetchRoutineState(user.id, today, todayKey),
+          fetchJournalPagesForDate(user.id, todayKey),
+          fetchWeeklyGoals(user.id, weekStart),
         ]);
-        setRoutine(data);
-        setScheduleStart(
-          profile?.routine_start_date ? parseISO(profile.routine_start_date) : new Date(),
+
+        if (cancelled) return;
+
+        const habitProgress = routineProgress(routine, completions, profile, today);
+        const journalProgress = journalPages.some(hasJournalContent) ? 1 : 0;
+        const todaysGoals = weeklyGoals.dailyGoals[weekDayKey(today)];
+        const goalProgress = goalsProgress(todaysGoals);
+        const slices: ScoreSlice[] = [
+          {
+            key: "habits",
+            label: "Habits",
+            value: habitProgress.percent,
+            done: habitProgress.done,
+            total: habitProgress.total,
+            color: "var(--routine-oral)",
+            href: "/today",
+            action: habitProgress.total === 0 ? "View routines" : "Complete habits",
+            detail:
+              habitProgress.total === 0
+                ? "No habits scheduled"
+                : `${habitProgress.done}/${habitProgress.total} complete`,
+            icon: <ListChecks className="h-4 w-4" />,
+          },
+          {
+            key: "journal",
+            label: "Journal",
+            value: journalProgress * 100,
+            done: journalProgress,
+            total: 1,
+            color: "var(--routine-makeup)",
+            href: "/journal",
+            action: journalProgress ? "Open journal" : "Write entry",
+            detail: journalProgress ? "Entry found" : "No entry yet",
+            icon: <BookOpen className="h-4 w-4" />,
+          },
+          {
+            key: "goals",
+            label: "Goals",
+            value: goalProgress.percent,
+            done: goalProgress.done,
+            total: goalProgress.total,
+            color: "var(--routine-skin-pm)",
+            href: "/goals",
+            action: goalProgress.done >= goalProgress.total ? "Review goals" : "Check goals",
+            detail: `${goalProgress.done}/${goalProgress.total} checked`,
+            icon: <Target className="h-4 w-4" />,
+          },
+        ];
+        const score = Math.round(
+          slices.reduce((total, slice) => total + slice.value, 0) / slices.length,
         );
-      } catch (e: unknown) {
-        toast.error(e instanceof Error ? e.message : "Failed to load routine");
+
+        setSummary({
+          score,
+          dateLabel: format(today, "EEEE, MMM d"),
+          slices,
+          bestAction: [...slices].sort((a, b) => a.value - b.value)[0],
+        });
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Failed to load today");
       } finally {
-        setBusy(false);
+        if (!cancelled) setBusy(false);
       }
     })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [user]);
 
-  const viewDateStr = format(viewDate, "yyyy-MM-dd");
-
-  // Reload completions whenever the viewed date changes
-  useEffect(() => {
-    if (!user) return;
-    (async () => {
-      const c = await fetchCompletionsForDate(user.id, viewDateStr);
-      setCompletions(c);
-    })();
-  }, [user, viewDateStr]);
-
-  const day = useMemo(
-    () => (scheduleStart ? scheduleDayFor(viewDate, scheduleStart) : 1),
-    [scheduleStart, viewDate],
-  );
-  const isViewingToday = isTodayFn(viewDate);
-  const isFuture = viewDate.getTime() > new Date().setHours(23, 59, 59, 999);
-
-  const todaysTasks = useMemo(() => {
-    if (!routine) return [];
-    return routine.flatMap((ft): TodayTask[] => {
-      const sched = ft.schedule.find((s) => s.schedule_slot === day);
-      if (!sched || !sched.variant_id) return [];
-      const variant = ft.variants.find((v) => v.id === sched.variant_id);
-      if (!variant) return [];
-      const completion = completions.find((c) => c.task_id === ft.task.id);
-      return [{ task: ft.task, variant, completion }];
-    });
-  }, [routine, day, completions]);
-
-  const amTasks = todaysTasks.filter((t) => t.task.time_of_day === "am");
-  const pmTasks = todaysTasks.filter((t) => t.task.time_of_day === "pm");
-  const anyTasks = todaysTasks.filter((t) => t.task.time_of_day === "any");
-  const otherTasks = todaysTasks.filter((t) => t.task.time_of_day === "other");
-  const unfinishedCounts = {
-    am: countUnfinished(amTasks),
-    any: countUnfinished(anyTasks),
-    pm: countUnfinished(pmTasks),
-    other: countUnfinished(otherTasks),
-  };
-  const visibleTaskCount =
-    timeFilter === "all"
-      ? todaysTasks.length
-      : timeFilter === "am"
-        ? amTasks.length
-        : timeFilter === "any"
-          ? anyTasks.length
-          : timeFilter === "pm"
-            ? pmTasks.length
-            : otherTasks.length;
-
-  async function toggleStep(taskId: string, step: string, allSteps: string[]) {
-    if (!user || isFuture) return;
-    const existing = completions.find((c) => c.task_id === taskId);
-    const current = (existing?.completed_steps as string[] | null) ?? [];
-    const next = current.includes(step) ? current.filter((s) => s !== step) : [...current, step];
-    const done = next.length >= allSteps.length;
-    const wasDone = !!existing?.done;
-
-    if (done && !wasDone && typeof navigator !== "undefined" && "vibrate" in navigator) {
-      navigator.vibrate?.([12, 40, 18]);
-    } else if (typeof navigator !== "undefined" && "vibrate" in navigator) {
-      navigator.vibrate?.(8);
-    }
-
-    setCompletions((prev) => {
-      const without = prev.filter((c) => c.task_id !== taskId);
-      const row: CompletionRow = {
-        id: existing?.id ?? "tmp",
-        user_id: user.id,
-        task_id: taskId,
-        date: viewDateStr,
-        completed_steps: next,
-        done,
-        completed_at: done ? new Date().toISOString() : null,
-      };
-      return [...without, row];
-    });
-
-    const { data, error } = await supabase
-      .from("completions")
-      .upsert(
-        {
-          user_id: user.id,
-          task_id: taskId,
-          date: viewDateStr,
-          completed_steps: next,
-          done,
-          completed_at: done ? new Date().toISOString() : null,
-        },
-        { onConflict: "user_id,task_id,date" },
-      )
-      .select()
-      .single();
-    if (error) {
-      toast.error("Couldn't save");
-    } else if (data) {
-      setCompletions((prev) => prev.map((c) => (c.task_id === taskId ? data : c)));
-    }
-  }
-
-  if (loading || busy) {
+  if (loading || busy || !summary) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center text-muted-foreground">
         <Sparkles className="mr-2 h-4 w-4 animate-pulse" /> loading LifeOS...
@@ -206,16 +158,14 @@ function TodayPage() {
         <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3">
           <div className="h-full flex flex-col justify-center">
             <Link to="/settings" className="icon-button" aria-label="Settings" title="Settings">
-              <UserRound className="h-[18px] w-[18px]" />
+              <Settings className="h-[18px] w-[18px]" />
             </Link>
           </div>
           <div className="text-center">
             <p className="text-[11px] font-semibold uppercase text-muted-foreground">
-              {format(viewDate, "EEE, MMM d")}
+              {summary.dateLabel}
             </p>
-            <h1 className="mt-1 text-3xl text-foreground">
-              {isViewingToday ? "Today" : format(viewDate, "MMM d")}
-            </h1>
+            <h1 className="mt-1 text-3xl text-foreground">LifeOS</h1>
           </div>
           <div className="flex h-full items-center justify-end">
             <ThemeToggle />
@@ -223,357 +173,184 @@ function TodayPage() {
         </div>
       </header>
 
-      <div className="mb-6 flex items-center justify-center gap-3">
-        <button
-          type="button"
-          onClick={() => setViewDate((d) => subDays(d, 1))}
-          className="icon-button"
-          aria-label="Previous day"
-        >
-          <ChevronLeft className="h-4 w-4" />
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            const d = new Date();
-            d.setHours(0, 0, 0, 0);
-            setViewDate(d);
-          }}
-          disabled={isViewingToday}
-          className="inline-flex min-w-24 items-center justify-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-sm font-bold text-foreground shadow-sm transition-transform active:scale-95 disabled:opacity-100"
-          aria-label={`Schedule day ${day}`}
-        >
-          <span className="pop-dot inline-block h-2 w-2 rounded-full bg-primary" />
-          Day {day}
-        </button>
-        <button
-          type="button"
-          onClick={() => setViewDate((d) => addDays(d, 1))}
-          disabled={isSameDay(viewDate, new Date())}
-          className="icon-button disabled:opacity-35 disabled:hover:translate-y-0 disabled:hover:text-muted-foreground"
-          aria-label="Next day"
-        >
-          <ChevronRight className="h-4 w-4" />
-        </button>
-      </div>
-
-      <TimeStrip
-        active={timeFilter}
-        onSelect={(next) => {
-          setTimeFilter((current) => (current === next && next !== "all" ? "all" : next));
-          setOpenTask(null);
-        }}
-        counts={{
-          am: amTasks.length,
-          any: anyTasks.length,
-          pm: pmTasks.length,
-          other: otherTasks.length,
-        }}
-        unfinishedCounts={unfinishedCounts}
-      />
-
-      {/* <RoutineTools /> */}
-
-      {todaysTasks.length === 0 ? (
-        <div className="surface p-8 text-center text-muted-foreground">
-          <Sparkles className="mx-auto mb-2 h-5 w-5 text-primary animate-wiggle" />
-          Rest day
-        </div>
-      ) : visibleTaskCount === 0 ? (
-        <div className="surface p-8 text-center text-muted-foreground">
-          <Sparkles className="mx-auto mb-2 h-5 w-5 text-primary animate-wiggle" />
-          No tasks here
-        </div>
-      ) : (
-        <>
-          {(timeFilter === "all" || timeFilter === "am") && (
-            <Section
-              icon={<Sun className="h-4 w-4" />}
-              title="Morning"
-              tasks={amTasks}
-              openTask={openTask}
-              setOpenTask={setOpenTask}
-              onToggle={toggleStep}
-              disabled={isFuture}
-            />
-          )}
-          {(timeFilter === "all" || timeFilter === "any") && (
-            <Section
-              icon={<Sparkles className="h-4 w-4" />}
-              title="Anytime"
-              tasks={anyTasks}
-              openTask={openTask}
-              setOpenTask={setOpenTask}
-              onToggle={toggleStep}
-              disabled={isFuture}
-            />
-          )}
-          {(timeFilter === "all" || timeFilter === "pm") && (
-            <Section
-              icon={<Moon className="h-4 w-4" />}
-              title="Evening"
-              tasks={pmTasks}
-              openTask={openTask}
-              setOpenTask={setOpenTask}
-              onToggle={toggleStep}
-              disabled={isFuture}
-            />
-          )}
-          {(timeFilter === "all" || timeFilter === "other") && (
-            <Section
-              icon={<CircleDashed className="h-4 w-4" />}
-              title="Other"
-              tasks={otherTasks}
-              openTask={openTask}
-              setOpenTask={setOpenTask}
-              onToggle={toggleStep}
-              disabled={isFuture}
-            />
-          )}
-        </>
-      )}
-
-      <RoutineTools />
-    </div>
-  );
-}
-
-function RoutineTools() {
-  const tools = [
-    {
-      to: "/grid",
-      label: "Calendar",
-      icon: <CalendarDays className="h-4 w-4" />,
-    },
-    {
-      to: "/stats",
-      label: "Progress",
-      icon: <Flame className="h-4 w-4" />,
-    },
-    {
-      to: "/manage",
-      label: "Edit",
-      icon: <Pencil className="h-4 w-4" />,
-    },
-  ] as const;
-
-  return (
-    <nav className="mb-6 grid grid-cols-3 gap-2" aria-label="Routine tools">
-      {tools.map((tool) => (
-        <Link
-          key={tool.to}
-          to={tool.to}
-          className="surface surface-interactive flex min-h-14 items-center justify-center gap-2 px-2 text-xs font-black text-foreground"
-        >
-          <span className="text-primary" aria-hidden>
-            {tool.icon}
-          </span>
-          <span className="truncate">{tool.label}</span>
-        </Link>
-      ))}
-    </nav>
-  );
-}
-
-function TimeStrip({
-  active,
-  counts,
-  unfinishedCounts,
-  onSelect,
-}: {
-  active: TimeFilter;
-  counts: Record<Exclude<TimeFilter, "all">, number>;
-  unfinishedCounts: Record<Exclude<TimeFilter, "all">, number>;
-  onSelect: (filter: TimeFilter) => void;
-}) {
-  const items = [
-    { key: "am", label: "Morning", icon: <Sun className="h-[18px] w-[18px]" /> },
-    { key: "any", label: "Anytime", icon: <Sparkles className="h-[18px] w-[18px]" /> },
-    { key: "pm", label: "Evening", icon: <Moon className="h-[18px] w-[18px]" /> },
-    { key: "other", label: "Other", icon: <CircleDashed className="h-[18px] w-[18px]" /> },
-  ] as const;
-  const total = Object.values(counts).reduce((sum, count) => sum + count, 0);
-
-  return (
-    <div className="mb-6 flex items-center justify-center gap-3 text-muted-foreground">
-      <button
-        type="button"
-        title={`All tasks: ${total}`}
-        aria-label={`All tasks: ${total}`}
-        aria-pressed={active === "all"}
-        onClick={() => onSelect("all")}
-        className={`flex h-9 min-w-12 items-center justify-center rounded-full px-3 text-xs font-black transition-colors ${
-          active === "all"
-            ? "bg-primary text-primary-foreground shadow-md"
-            : "bg-card text-foreground hover:bg-muted"
-        }`}
-      >
-        All
-      </button>
-      {items.map((item) => {
-        const count = counts[item.key];
-        const unfinishedCount = unfinishedCounts[item.key];
-        const selected = active === item.key;
-        return (
-          <button
-            type="button"
-            key={item.key}
-            title={`${item.label}: ${count}`}
-            aria-label={`${item.label}: ${count}`}
-            aria-pressed={selected}
-            onClick={() => onSelect(item.key)}
-            className={`relative flex h-9 w-9 items-center justify-center rounded-full transition-colors ${
-              selected
-                ? "bg-primary text-primary-foreground shadow-md"
-                : count > 0
-                  ? "text-foreground hover:bg-muted"
-                  : "text-muted-foreground/35 hover:bg-muted"
-            }`}
-          >
-            {item.icon}
-            {unfinishedCount > 0 && !selected && (
-              <span className="absolute -right-0.5 -bottom-0.5 h-2.5 w-2.5 rounded-full border-2 border-background bg-primary" />
-            )}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-function countUnfinished(tasks: TodayTask[]) {
-  return tasks.filter((t) => !t.completion?.done).length;
-}
-
-function Section({
-  icon,
-  title,
-  tasks,
-  openTask,
-  setOpenTask,
-  onToggle,
-  disabled,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  tasks: TodayTask[];
-  openTask: string | null;
-  setOpenTask: (id: string | null) => void;
-  onToggle: (taskId: string, step: string, all: string[]) => void;
-  disabled?: boolean;
-}) {
-  if (tasks.length === 0) return null;
-  return (
-    <section className="mb-6 animate-fade-up" aria-label={title}>
-      <h2 className="mb-3 flex items-center justify-center gap-2 text-m font-bold text-muted-foreground">
-        {/* <span className="text-primary" aria-hidden>
-          {icon}
-        </span> */}
-        <span className="text-primary" aria-hidden>
-          {title}
-        </span>
-        <span className="sr-only">{title}</span>
-        {/* <span aria-hidden>{tasks.length}</span> */}
-      </h2>
-      <ul className="space-y-2">
-        {tasks.map(({ task, variant, completion }) => {
-          const steps = (variant.steps as string[]) ?? [];
-          const done = (completion?.completed_steps as string[] | null) ?? [];
-          const isDone = !!completion?.done;
-          const isOpen = openTask === task.id;
-          const fillColor = colorValue(task.color);
-          const ratio = steps.length === 0 ? (isDone ? 1 : 0) : done.length / steps.length;
-          const fillWidth = Math.min(100, Math.max(0, Math.round(ratio * 100)));
-          return (
-            <li
-              key={task.id}
-              className="habit-pill relative overflow-hidden border border-border bg-card/85 transition-transform active:scale-[0.985]"
+      <section className="surface p-5">
+        <div className="flex flex-col items-center gap-5 lg:flex-row lg:justify-center">
+          <ScoreRings score={summary.score} slices={summary.slices} />
+          <div className="w-full max-w-sm space-y-3">
+            <p className="text-xs font-black uppercase text-muted-foreground">Daily score</p>
+            <h2 className="text-2xl text-foreground">{scoreMessage(summary.score)}</h2>
+            <p className="text-sm text-muted-foreground">
+              {summary.bestAction.value >= 100
+                ? "Everything is closed out for today."
+                : `${summary.bestAction.label} is the next area to move.`}
+            </p>
+            <Link
+              to={summary.bestAction.href}
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-primary px-4 text-sm font-bold text-primary-foreground shadow transition-transform active:scale-95"
             >
-              <span
-                aria-hidden
-                className="pointer-events-none absolute inset-y-0 left-0 opacity-60 transition-all duration-500 ease-out"
-                style={{
-                  backgroundColor: fillColor,
-                  width: `${fillWidth}%`,
-                }}
+              {summary.bestAction.action}
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      <section className="mt-5 grid gap-3 lg:grid-cols-3">
+        {summary.slices.map((slice) => (
+          <ScoreCard key={slice.key} slice={slice} />
+        ))}
+      </section>
+    </div>
+  );
+}
+
+async function fetchRoutineState(userId: string, today: Date, todayKey: string) {
+  const [routine, completions, profile] = await Promise.all([
+    fetchAllRoutine(userId),
+    fetchCompletionsForDate(userId, todayKey),
+    fetchProfile(userId),
+  ]);
+  return { routine, completions, profile, today };
+}
+
+async function fetchJournalPagesForDate(userId: string, date: string) {
+  const { data, error } = await supabase
+    .from("journal_note_pages")
+    .select("id, heading, content_text")
+    .eq("user_id", userId)
+    .eq("entry_date", date);
+
+  if (error) throw error;
+  return data ?? [];
+}
+
+function routineProgress(
+  routine: FullTask[],
+  completions: CompletionRow[],
+  profile: Awaited<ReturnType<typeof fetchProfile>>,
+  today: Date,
+) {
+  const start = profile?.routine_start_date ? parseISO(profile.routine_start_date) : today;
+  const slot = scheduleDayFor(today, start);
+  const scheduled = routine.flatMap((full) => {
+    const scheduledSlot = full.schedule.find((entry) => entry.schedule_slot === slot);
+    if (!scheduledSlot?.variant_id) return [];
+    return [full.task.id];
+  });
+  const done = scheduled.filter(
+    (taskId) => completions.find((completion) => completion.task_id === taskId)?.done,
+  ).length;
+  return {
+    done,
+    total: scheduled.length,
+    percent: scheduled.length === 0 ? 100 : Math.round((done / scheduled.length) * 100),
+  };
+}
+
+function goalsProgress(items: GoalItem[]) {
+  const total = Math.max(3, items.length);
+  const done = items.filter((item) => item.done && item.text.trim().length > 0).length;
+  return {
+    done,
+    total,
+    percent: Math.round((done / total) * 100),
+  };
+}
+
+function hasJournalContent(page: { heading: string | null; content_text: string | null }) {
+  return [page.heading, page.content_text].some((value) => (value ?? "").trim().length > 0);
+}
+
+function weekDayKey(date: Date): WeekDayKey {
+  return WEEK_DAY_KEYS[(date.getDay() + 6) % 7];
+}
+
+function scoreMessage(score: number) {
+  if (score >= 95) return "Today is complete";
+  if (score >= 70) return "Nearly there";
+  if (score >= 40) return "In progress";
+  return "Start with one thing";
+}
+
+function ScoreRings({ score, slices }: { score: number; slices: ScoreSlice[] }) {
+  const rings = slices.map((slice, index) => ({
+    ...slice,
+    radius: 88 - index * 18,
+  }));
+
+  return (
+    <div className="relative flex h-64 w-64 shrink-0 items-center justify-center">
+      <svg className="h-full w-full -rotate-90" viewBox="0 0 220 220" aria-hidden>
+        {rings.map((ring) => {
+          const circumference = 2 * Math.PI * ring.radius;
+          return (
+            <g key={ring.key}>
+              <circle
+                cx="110"
+                cy="110"
+                r={ring.radius}
+                fill="none"
+                stroke="var(--muted)"
+                strokeWidth="11"
               />
-              <button
-                type="button"
-                onClick={() => setOpenTask(isOpen ? null : task.id)}
-                className="relative flex min-h-20 w-full items-center gap-3 px-3 py-3 text-left"
-              >
-                <span
-                  className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-[1.15rem] text-xl font-bold text-white shadow-sm transition-transform ${isOpen ? "scale-105" : ""}`}
-                  style={{ backgroundColor: fillColor }}
-                  aria-hidden
-                >
-                  {isDone ? (
-                    <Check className="h-5 w-5 animate-check" strokeWidth={3} />
-                  ) : (
-                    glyphFor(variant.symbol)
-                  )}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span
-                    className={`block truncate text-base font-extrabold text-foreground ${isDone ? "line-through decoration-foreground/50" : ""}`}
-                  >
-                    {task.name}
-                  </span>
-                  <span className="mt-1 inline-flex max-w-full rounded-full bg-background/70 px-2 py-0.5 text-[11px] font-black uppercase text-foreground/75 ring-1 ring-border/60 backdrop-blur-sm">
-                    {steps.length ? `${done.length} / ${steps.length}` : variant.label}
-                  </span>
-                </span>
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-background/75 text-foreground/70 ring-1 ring-border/50 backdrop-blur-sm">
-                  {isDone ? (
-                    <Check className="h-5 w-5 animate-check" strokeWidth={2.5} />
-                  ) : isOpen ? (
-                    <ChevronDown className="h-5 w-5 rotate-180 transition-transform" />
-                  ) : (
-                    <Plus className="h-5 w-5" />
-                  )}
-                </span>
-              </button>
-              {isOpen && (
-                <ul className="relative mx-3 mb-3 rounded-[1.15rem] border border-white/30 bg-card/90 px-2 py-2 shadow-sm backdrop-blur animate-fade-up">
-                  {steps.map((step) => {
-                    const checked = done.includes(step);
-                    return (
-                      <li key={step}>
-                        <button
-                          type="button"
-                          disabled={disabled}
-                          onClick={() => onToggle(task.id, step, steps)}
-                          className="flex w-full items-center gap-3 rounded-2xl px-2.5 py-2.5 text-left transition-colors hover:bg-muted/60 disabled:opacity-50"
-                        >
-                          <span
-                            className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition-all ${
-                              checked
-                                ? "border-primary bg-primary text-primary-foreground scale-110"
-                                : "border-border bg-card"
-                            }`}
-                          >
-                            {checked && (
-                              <Check className="h-3.5 w-3.5 animate-check" strokeWidth={3} />
-                            )}
-                          </span>
-                          <span
-                            className={`text-sm transition-colors ${checked ? "text-muted-foreground line-through" : "text-foreground"}`}
-                          >
-                            {step}
-                          </span>
-                        </button>
-                      </li>
-                    );
-                  })}
-                  {disabled && (
-                    <li className="px-2.5 py-1.5 text-[11px] text-muted-foreground">Locked</li>
-                  )}
-                </ul>
-              )}
-            </li>
+              <circle
+                cx="110"
+                cy="110"
+                r={ring.radius}
+                fill="none"
+                stroke={ring.color}
+                strokeWidth="11"
+                strokeLinecap="round"
+                strokeDasharray={circumference}
+                strokeDashoffset={circumference * (1 - ring.value / 100)}
+                className="transition-all duration-700 ease-out"
+              />
+            </g>
           );
         })}
-      </ul>
-    </section>
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+        <p className="text-[11px] font-black uppercase text-muted-foreground">Score</p>
+        <p className="text-5xl font-black text-foreground">{score}</p>
+        <p className="text-xs font-bold text-muted-foreground">/ 100</p>
+      </div>
+    </div>
+  );
+}
+
+function ScoreCard({ slice }: { slice: ScoreSlice }) {
+  const complete = slice.value >= 100;
+  return (
+    <article className="surface overflow-hidden p-4">
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <span
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white shadow-sm"
+            style={{ backgroundColor: slice.color }}
+            aria-hidden
+          >
+            {complete ? <Check className="h-4 w-4" strokeWidth={3} /> : slice.icon}
+          </span>
+          <div className="min-w-0">
+            <h2 className="truncate text-base font-bold text-foreground">{slice.label}</h2>
+            <p className="mt-0.5 text-xs font-medium text-muted-foreground">{slice.detail}</p>
+          </div>
+        </div>
+        <p className="shrink-0 text-lg font-black text-foreground">{slice.value}%</p>
+      </div>
+      <div className="h-2 overflow-hidden rounded-full bg-muted">
+        <div
+          className="h-full rounded-full transition-all duration-700"
+          style={{ width: `${slice.value}%`, backgroundColor: slice.color }}
+        />
+      </div>
+      <Link
+        to={slice.href}
+        className="mt-4 flex h-10 items-center justify-center gap-2 rounded-full border border-border bg-background/70 px-3 text-sm font-bold text-foreground transition-colors hover:bg-muted"
+      >
+        {slice.action}
+        <ArrowRight className="h-4 w-4" />
+      </Link>
+    </article>
   );
 }
