@@ -25,7 +25,6 @@ import {
   Sparkles,
   Sun,
   Moon,
-  UserRound,
 } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { toast } from "sonner";
@@ -203,13 +202,8 @@ function TodayPage() {
   return (
     <div className="px-5 pt-8 animate-fade-up">
       <header className="mb-6">
-        <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3">
-          <div className="h-full flex flex-col justify-center">
-            <Link to="/settings" className="icon-button" aria-label="Settings" title="Settings">
-              <UserRound className="h-[18px] w-[18px]" />
-            </Link>
-          </div>
-          <div className="text-center">
+        <div className="flex items-center justify-between gap-3">
+          <div>
             <p className="text-[11px] font-semibold uppercase text-muted-foreground">
               {format(viewDate, "EEE, MMM d")}
             </p>
@@ -217,9 +211,7 @@ function TodayPage() {
               {isViewingToday ? "Today" : format(viewDate, "MMM d")}
             </h1>
           </div>
-          <div className="flex h-full items-center justify-end">
-            <ThemeToggle />
-          </div>
+          <ThemeToggle />
         </div>
       </header>
 

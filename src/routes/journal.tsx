@@ -77,7 +77,6 @@ import {
   Trash2,
   Type,
   Underline,
-  UserRound,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -1687,10 +1686,7 @@ function JournalPage() {
   return (
     <div className="px-4 pt-8 pb-6 animate-fade-up lg:px-6">
       <header className="mb-5">
-        <div className="grid grid-cols-[auto_1fr_auto] items-center">
-          <Link to="/settings" className="icon-button" aria-label="Settings" title="Settings">
-            <UserRound className="h-[18px] w-[18px]" />
-          </Link>
+        <div className="flex items-center justify-end">
           {/* <div className="text-center">
             <p className="text-[11px] font-semibold uppercase text-muted-foreground">
               {notes.length} note{notes.length === 1 ? "" : "s"}

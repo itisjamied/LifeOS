@@ -10,7 +10,7 @@ import { useEffect } from "react";
 import appCss from "../styles.css?url";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { Toaster } from "@/components/ui/sonner";
-import { BookOpen, House, Settings, Target } from "lucide-react";
+import { BookOpen, House, ListChecks, Settings, Target } from "lucide-react";
 
 function NotFoundComponent() {
   return (
@@ -106,26 +106,37 @@ function BottomNav() {
   const { user } = useAuth();
   const path = useRouterState({ select: (s) => s.location.pathname });
   if (!user) return null;
-  const isHomeArea =
-    path === "/" ||
+  const isHabitsArea =
     path === "/today" ||
     path === "/grid" ||
     path === "/stats" ||
     path === "/manage" ||
     path.startsWith("/habit/");
-  const tab = (to: string, icon: React.ReactNode, label: string, active = path === to) => {
+  const tab = (
+    to: string,
+    icon: React.ReactNode,
+    label: string,
+    active = path === to,
+    variant: "side" | "cluster" = "side",
+  ) => {
     return (
       <Link
         to={to}
         aria-label={label}
         title={label}
-        className={`flex flex-1 items-center justify-center py-3 transition-colors ${
-          active ? "text-primary" : "text-muted-foreground hover:text-foreground"
-        }`}
+        className={`flex items-center justify-center transition-colors ${
+          variant === "side" ? "h-12 min-w-12 flex-1" : "h-11 min-w-11 flex-1"
+        } ${active ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
       >
         <span
-          className={`flex h-10 w-10 items-center justify-center rounded-full transition-all ${
-            active ? "bg-primary/15 shadow-sm" : ""
+          className={`flex items-center justify-center rounded-full transition-all ${
+            variant === "side" ? "h-10 w-10" : "h-9 w-9"
+          } ${
+            active
+              ? variant === "side"
+                ? "bg-primary/15 shadow-sm"
+                : "bg-background/80 shadow-sm"
+              : ""
           }`}
         >
           {icon}
@@ -136,14 +147,27 @@ function BottomNav() {
   };
   return (
     <nav
-      className="fixed right-4 left-4 z-40 rounded-[2rem] border border-border bg-card/90 shadow-xl backdrop-blur"
+      className="fixed right-4 left-4 z-40"
       style={{ bottom: "calc(1rem + env(safe-area-inset-bottom))" }}
     >
-      <div className="mx-auto flex max-w-md">
-        {tab("/", <House className="h-5 w-5" />, "Home", isHomeArea)}
-        {tab("/goals", <Target className="h-5 w-5" />, "Goals")}
-        {tab("/journal", <BookOpen className="h-5 w-5" />, "Journal")}
-        {tab("/settings", <Settings className="h-5 w-5" />, "Settings")}
+      <div className="mx-auto grid h-16 max-w-md grid-cols-[minmax(2.75rem,1fr)_minmax(10.5rem,12rem)_minmax(2.75rem,1fr)] items-center gap-2 rounded-[2rem] border border-border bg-card/90 px-2 py-2 shadow-xl backdrop-blur">
+        <div className="flex min-w-0 justify-start">
+          {tab("/", <House className="h-5 w-5" />, "Home")}
+        </div>
+        <div className="z-10 grid w-full grid-cols-3 gap-1 justify-self-center">
+          {tab("/today", <ListChecks className="h-5 w-5" />, "Habits", isHabitsArea, "cluster")}
+          {tab("/goals", <Target className="h-5 w-5" />, "Goals", path === "/goals", "cluster")}
+          {tab(
+            "/journal",
+            <BookOpen className="h-5 w-5" />,
+            "Journal",
+            path === "/journal",
+            "cluster",
+          )}
+        </div>
+        <div className="flex min-w-0 justify-end">
+          {tab("/settings", <Settings className="h-5 w-5" />, "Settings")}
+        </div>
       </div>
     </nav>
   );

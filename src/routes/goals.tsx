@@ -21,7 +21,6 @@ import {
   ClipboardList,
   Sparkles,
   Target,
-  UserRound,
 } from "lucide-react";
 import {
   addDays,
@@ -194,21 +193,14 @@ function GoalsPage() {
   return (
     <div className="px-5 pt-8 animate-fade-up">
       <header className="mb-6">
-        <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3">
-          <div className="h-full flex flex-col justify-center">
-            <Link to="/settings" className="icon-button" aria-label="Settings" title="Settings">
-              <UserRound className="h-[18px] w-[18px]" />
-            </Link>
-          </div>
-          <div className="text-center">
+        <div className="flex items-center justify-between gap-3">
+          <div>
             <p className="text-[11px] font-semibold uppercase text-muted-foreground">
               {format(weekStartDate, "MMM d")} - {format(weekEndDate, "MMM d")}
             </p>
             <h1 className="mt-1 text-3xl text-foreground">Goals</h1>
           </div>
-          <div className="flex h-full items-center justify-end">
-            <ThemeToggle />
-          </div>
+          <ThemeToggle />
         </div>
       </header>
 
