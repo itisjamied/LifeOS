@@ -11,6 +11,7 @@ import { fetchWeeklyGoals, WEEK_DAY_KEYS, type GoalItem, type WeekDayKey } from 
 import { supabase } from "@/integrations/supabase/client";
 import { scheduleDayFor, todayISO } from "@/lib/schedule";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { PageHeader } from "@/components/page-header";
 import { addDays, format, parseISO, startOfWeek } from "date-fns";
 import { BookOpen, Check, ListChecks, Sparkles, Target } from "lucide-react";
 import { toast } from "sonner";
@@ -153,17 +154,7 @@ function HomePage() {
 
   return (
     <div className="px-5 pt-8 animate-fade-up">
-      <header className="mb-6">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <p className="text-[11px] font-semibold uppercase text-muted-foreground">
-              {summary.dateLabel}
-            </p>
-            <h1 className="mt-1 text-3xl text-foreground">LifeOS</h1>
-          </div>
-          <ThemeToggle />
-        </div>
-      </header>
+      <PageHeader eyebrow={summary.dateLabel} title="LifeOS" actions={<ThemeToggle />} />
 
       <section className="surface p-5">
         <div className="flex flex-col items-center gap-5 lg:flex-row lg:justify-center">
@@ -246,8 +237,12 @@ function buildScoreSlices({
       href: "/today",
       detail:
         habitProgress.total === 0
-          ? "No habits scheduled"
-          : `${habitProgress.done}/${habitProgress.total} complete`,
+          ? habitProgress.skipped > 0
+            ? `${habitProgress.skipped} skipped`
+            : "No habits scheduled"
+          : `${habitProgress.done}/${habitProgress.total} complete${
+              habitProgress.skipped > 0 ? `, ${habitProgress.skipped} skipped` : ""
+            }`,
       icon: <ListChecks className="h-4 w-4" />,
     },
     {
@@ -313,13 +308,20 @@ function routineProgress(
     if (!scheduledSlot?.variant_id) return [];
     return [full.task.id];
   });
-  const done = scheduled.filter(
+  const skipped = scheduled.filter(
+    (taskId) => completions.find((completion) => completion.task_id === taskId)?.skipped,
+  ).length;
+  const activeScheduled = scheduled.filter(
+    (taskId) => !completions.find((completion) => completion.task_id === taskId)?.skipped,
+  );
+  const done = activeScheduled.filter(
     (taskId) => completions.find((completion) => completion.task_id === taskId)?.done,
   ).length;
   return {
     done,
-    total: scheduled.length,
-    percent: scheduled.length === 0 ? 100 : Math.round((done / scheduled.length) * 100),
+    skipped,
+    total: activeScheduled.length,
+    percent: activeScheduled.length === 0 ? 100 : Math.round((done / activeScheduled.length) * 100),
   };
 }
 

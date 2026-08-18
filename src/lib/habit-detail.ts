@@ -8,6 +8,7 @@ export interface DayEntry {
   iso: string;
   scheduled: boolean;
   done: boolean;
+  skipped: boolean;
 }
 
 export async function fetchHabitHistory(
@@ -21,14 +22,28 @@ export async function fetchHabitHistory(
   const lastDate = startDate ? addDays(firstDate, windowDays - 1) : new Date();
   const since = format(firstDate, "yyyy-MM-dd");
   const until = format(lastDate, "yyyy-MM-dd");
-  const { data } = await supabase
+  const result = await supabase
     .from("completions")
-    .select("date, done")
+    .select("date, done, skipped")
     .eq("user_id", userId)
     .eq("task_id", ft.task.id)
     .gte("date", since)
     .lte("date", until);
-  const doneSet = new Set((data ?? []).filter((c) => c.done).map((c) => c.date));
+
+  let rows = result.data ?? [];
+  if (result.error && isMissingSkippedColumnError(result.error)) {
+    const fallback = await supabase
+      .from("completions")
+      .select("date, done")
+      .eq("user_id", userId)
+      .eq("task_id", ft.task.id)
+      .gte("date", since)
+      .lte("date", until);
+    rows = (fallback.data ?? []).map((row) => ({ ...row, skipped: false }));
+  }
+
+  const doneSet = new Set(rows.filter((c) => c.done).map((c) => c.date));
+  const skippedSet = new Set(rows.filter((c) => c.skipped).map((c) => c.date));
 
   const today = new Date();
   const scheduleStartDay = startOfDay(scheduleStart);
@@ -44,6 +59,7 @@ export async function fetchHabitHistory(
       iso,
       scheduled: !isBeforeScheduleStart && !!sched?.variant_id,
       done: doneSet.has(iso),
+      skipped: skippedSet.has(iso),
     });
   }
   return entries;
@@ -62,6 +78,7 @@ export function computeStreakRuns(entries: DayEntry[]): StreakRun[] {
   let len = 0;
   for (const e of entries) {
     if (!e.scheduled) continue;
+    if (e.skipped) continue;
     if (isToday(e.date) && !e.done) continue;
     if (e.done) {
       if (!curStart) curStart = e.date;
@@ -76,4 +93,17 @@ export function computeStreakRuns(entries: DayEntry[]): StreakRun[] {
   }
   if (curStart && curEnd) runs.push({ start: curStart, end: curEnd, length: len });
   return runs.sort((a, b) => b.length - a.length);
+}
+
+function isMissingSkippedColumnError(error: {
+  message?: string;
+  details?: string;
+  hint?: string;
+  code?: string;
+}) {
+  const text = [error.message, error.details, error.hint, error.code]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  return text.includes("skipped") && (text.includes("column") || text.includes("schema cache"));
 }

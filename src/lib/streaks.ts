@@ -28,12 +28,24 @@ export async function computeStats(
   windowDays = 90,
 ): Promise<TaskStats[]> {
   const since = format(subDays(new Date(), windowDays - 1), "yyyy-MM-dd");
-  const { data } = await supabase
+  const result = await supabase
     .from("completions")
-    .select("task_id, date, done")
+    .select("task_id, date, done, skipped")
     .eq("user_id", userId)
     .gte("date", since);
-  const doneSet = new Set((data ?? []).filter((c) => c.done).map((c) => `${c.task_id}|${c.date}`));
+
+  let rows = result.data ?? [];
+  if (result.error && isMissingSkippedColumnError(result.error)) {
+    const fallback = await supabase
+      .from("completions")
+      .select("task_id, date, done")
+      .eq("user_id", userId)
+      .gte("date", since);
+    rows = (fallback.data ?? []).map((row) => ({ ...row, skipped: false }));
+  }
+
+  const doneSet = new Set(rows.filter((c) => c.done).map((c) => `${c.task_id}|${c.date}`));
+  const skippedSet = new Set(rows.filter((c) => c.skipped).map((c) => `${c.task_id}|${c.date}`));
 
   const today = new Date();
   const scheduleStartDay = startOfDay(scheduleStart);
@@ -53,6 +65,7 @@ export async function computeStats(
       if (isBefore(startOfDay(d), scheduleStartDay)) break;
       if (!isScheduledOn(ft, d, scheduleStart)) continue;
       const key = `${ft.task.id}|${format(d, "yyyy-MM-dd")}`;
+      if (skippedSet.has(key)) continue;
       const isDone = doneSet.has(key);
       if (i === 0 && !isDone) continue;
 
@@ -90,4 +103,17 @@ export function dateKey(d: Date): string {
 
 export function parseDateKey(s: string): Date {
   return parseISO(s);
+}
+
+function isMissingSkippedColumnError(error: {
+  message?: string;
+  details?: string;
+  hint?: string;
+  code?: string;
+}) {
+  const text = [error.message, error.details, error.hint, error.code]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  return text.includes("skipped") && (text.includes("column") || text.includes("schema cache"));
 }

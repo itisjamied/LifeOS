@@ -1,6 +1,6 @@
 # LifeOS
 
-LifeOS is a mobile-first personal system built as a TypeScript React app. It tracks daily routines, task variants, completion streaks, weekly goals, and a private journal with folders, pages, rich text, and attachments.
+LifeOS is a mobile-first personal system built as a TypeScript React app. It tracks daily routines, task variants, completion streaks, weekly goals, and a private journal with folders, entries, sections, rich text, and attachments.
 
 ## How The App Fits Together
 
@@ -31,7 +31,7 @@ There is no separate Express, Next.js API route layer, or custom Node backend in
 | Icons                 | `lucide-react`                   | Icons in navigation, forms, habit cards, journal toolbar, settings, and stats.                                                                             |
 | Auth                  | Supabase Auth                    | Email/password signup, signin, signout, session persistence.                                                                                               |
 | Database              | Supabase Postgres                | Routine, completions, journal, attachment metadata, profiles, and weekly goals.                                                                            |
-| Storage               | Supabase Storage                 | Private `journal-attachments` bucket for uploaded note files/images.                                                                                       |
+| Storage               | Supabase Storage                 | Private `journal-attachments` bucket for uploaded journal files/images.                                                                                    |
 | Hosting target        | Cloudflare Worker                | `@cloudflare/vite-plugin`, `wrangler.jsonc`, and generated `dist/server/wrangler.json`.                                                                    |
 | PWA                   | Web manifest + service worker    | `public/manifest.webmanifest` and `public/sw.js` make the app installable and cache the app shell.                                                         |
 | Dates                 | `date-fns`                       | Recurring schedule math, week navigation, calendar dates, streak windows, labels.                                                                          |
@@ -43,6 +43,7 @@ There is no separate Express, Next.js API route layer, or custom Node backend in
 ```text
 src/
   components/
+    page-header.tsx
     theme-toggle.tsx
     ui/
       app-dialog.tsx
@@ -85,18 +86,18 @@ src/
 
 ## Routes And Features
 
-| Route            | File                           | Purpose                                                                                                                  |
-| ---------------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
-| `/auth`          | `src/routes/auth.tsx`          | Email/password signup and signin with Supabase Auth.                                                                     |
-| `/`              | `src/routes/index.tsx`         | Daily score dashboard for habits, journaling, and goals with ring-style progress and completion links.                   |
-| `/today`         | `src/routes/today.tsx`         | Routine checklist. Computes the active schedule slot, lists scheduled tasks by time of day, and upserts completions.     |
-| `/grid`          | `src/routes/grid.tsx`          | Routine calendar showing which variant is scheduled for each task and slot.                                              |
-| `/stats`         | `src/routes/stats.tsx`         | Progress view with current streak, best streak, and consistency.                                                         |
-| `/habit/$taskId` | `src/routes/habit.$taskId.tsx` | Individual habit detail with calendar and streak runs.                                                                   |
-| `/manage`        | `src/routes/manage.tsx`        | CRUD editor for tasks, variants, steps, colors, time-of-day labels, task order, variant order, and schedules.            |
-| `/goals`         | `src/routes/goals.tsx`         | Weekly intention and daily three goals, autosaved into Supabase.                                                         |
-| `/journal`       | `src/routes/journal.tsx`       | Private journal with folders, multi-page notes, rich-text toolbar, search/calendar views, bulk actions, and attachments. |
-| `/settings`      | `src/routes/settings.tsx`      | Profile settings, routine start date, signout, CSV export, and PDF export.                                               |
+| Route            | File                           | Purpose                                                                                                                    |
+| ---------------- | ------------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
+| `/auth`          | `src/routes/auth.tsx`          | Email/password signup and signin with Supabase Auth.                                                                       |
+| `/`              | `src/routes/index.tsx`         | Daily score dashboard for habits, journaling, and goals with ring-style progress and completion links.                     |
+| `/today`         | `src/routes/today.tsx`         | Routine checklist. Computes the active schedule slot, lists scheduled tasks by time of day, and upserts completions/skips. |
+| `/grid`          | `src/routes/grid.tsx`          | Routine calendar showing which variant is scheduled for each task and slot.                                                |
+| `/stats`         | `src/routes/stats.tsx`         | Progress view with current streak, best streak, and consistency.                                                           |
+| `/habit/$taskId` | `src/routes/habit.$taskId.tsx` | Individual habit detail with calendar and streak runs.                                                                     |
+| `/manage`        | `src/routes/manage.tsx`        | CRUD editor for tasks, variants, steps, colors, time-of-day labels, task order, variant order, and schedules.              |
+| `/goals`         | `src/routes/goals.tsx`         | Weekly intention and daily three goals, autosaved into Supabase.                                                           |
+| `/journal`       | `src/routes/journal.tsx`       | Private journal with folders, entries, sections, rich-text toolbar, search/calendar views, bulk actions, and attachments.  |
+| `/settings`      | `src/routes/settings.tsx`      | Profile settings, routine start date, signout, CSV export, and PDF export.                                                 |
 
 `src/routes/__root.tsx` wraps the whole app with `AuthProvider`, the `Sonner` toaster, PWA registration, route metadata, and the authenticated bottom navigation.
 
@@ -122,10 +123,10 @@ The app uses Supabase for three things:
 | `tasks`               | User-owned routine categories such as oral care, skin care, haircare, shower, etc. Includes color, time of day, and sort order. |
 | `task_variants`       | Variants for a task. Stores symbol, label, steps as JSONB, and sort order.                                                      |
 | `task_schedule`       | Maps each task to a variant for each recurring `schedule_slot`.                                                                 |
-| `completions`         | Actual completion state per user/task/date, including completed steps, `done`, and `completed_at`.                              |
+| `completions`         | Actual completion state per user/task/date, including completed steps, `done`, `skipped`, and `completed_at`.                   |
 | `journal_folders`     | User-owned journal folders.                                                                                                     |
-| `journal_notes`       | Note-level metadata: title, folder, tags, entry date/time, and legacy content fields.                                           |
-| `journal_note_pages`  | Multi-page note bodies with title, heading, HTML content, plain-text content, entry date/time, and sort order.                  |
+| `journal_notes`       | Entry-level metadata: title, folder, tags, entry date/time, and legacy content fields.                                          |
+| `journal_note_pages`  | Entry sections with title, heading, HTML content, plain-text content, entry date/time, and sort order.                          |
 | `journal_attachments` | Attachment metadata: filename, MIME type, file size, and Supabase Storage path.                                                 |
 | `weekly_goals`        | Weekly intention plus daily goals stored as JSONB.                                                                              |
 
@@ -145,10 +146,11 @@ Migrations live in `supabase/migrations` and create:
 
 - Base routine schema, profile trigger, RLS policies, and indexes.
 - A duplicate-task cleanup plus `UNIQUE (user_id, name)` on `tasks`.
-- Journal folders, notes, attachments, storage bucket, policies, and indexes.
-- Journal note pages, page dates/times, headings, and search index updates.
+- Journal folders, entries, attachments, storage bucket, policies, and indexes.
+- Journal entry sections, section dates/times, headings, and search index updates.
 - Weekly goals table, RLS policy, index, and updated-at trigger.
 - LifeOS naming updates for routine and schedule fields.
+- A `skipped` flag on completions so intentional skips are neutral in score, stats, and streaks.
 
 `src/integrations/supabase/types.ts` is the generated TypeScript database type file used by the data helpers.
 
@@ -165,6 +167,7 @@ Examples:
 - Home view combines habit completions, today's journal activity, and today's goals into the daily LifeOS score.
 - Today view fetches routine rows plus the user's profile, computes the current schedule slot, then loads completions for the selected date.
 - Checking a task step optimistically updates local state and upserts into `completions`.
+- Completing, clearing, or skipping a whole habit uses the same optimistic completion upsert path.
 - Manage view edits `tasks`, `task_variants`, and `task_schedule`.
 - Journal uploads files to Supabase Storage and stores file metadata in `journal_attachments`.
 - Goals autosave with a debounce into `weekly_goals`.
@@ -179,6 +182,7 @@ Styling is centered in `src/styles.css`:
 - CSS custom properties define light/dark theme tokens, radius tokens, app color tokens, and routine color tokens.
 - Dark mode toggles the `.dark` class on `document.documentElement`.
 - `ThemeToggle` stores the user's preference in `localStorage`.
+- `PageHeader` gives primary app views a shared left-aligned title, eyebrow, and action layout.
 - The app loads Inter from Google Fonts with a local `@font-face` declaration.
 
 Local UI helpers:

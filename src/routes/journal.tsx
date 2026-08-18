@@ -2,6 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { PageHeader } from "@/components/page-header";
 import { Input } from "@/components/ui/input";
 import {
   AppConfirmDialog,
@@ -87,7 +88,7 @@ export const Route = createFileRoute("/journal")({
       { title: "Journal - LifeOS" },
       {
         name: "description",
-        content: "Private folders, rich notes, attachments and a monthly journal calendar.",
+        content: "Private folders, rich entries, attachments and a monthly journal calendar.",
       },
     ],
   }),
@@ -906,7 +907,7 @@ function JournalPage() {
         saveStateRef.current = "dirty";
         setSaveState("dirty");
       }
-      toast.error(e instanceof Error ? e.message : "Couldn't save note");
+      toast.error(e instanceof Error ? e.message : "Couldn't save entry");
     }
   }, []);
 
@@ -982,7 +983,7 @@ function JournalPage() {
       setDayModalDate(null);
       setSearchOpen(false);
     } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : "Couldn't add note");
+      toast.error(e instanceof Error ? e.message : "Couldn't add entry");
     }
   };
 
@@ -994,10 +995,10 @@ function JournalPage() {
     const entryDate = todayISO(createdAt);
     const entryTime = createdAt.toTimeString().slice(0, 5);
     setTextDialog({
-      title: "New page",
-      label: "Page name",
+      title: "New section",
+      label: "Section name",
       initialValue: format(createdAt, "MMM d"),
-      confirmLabel: "Add page",
+      confirmLabel: "Add section",
       onSubmit: async (title) => {
         if (saveStateRef.current === "dirty") await saveDraft();
         try {
@@ -1019,7 +1020,7 @@ function JournalPage() {
           setSelectedPageId(page.id);
           setPagePickerOpen(false);
         } catch (e: unknown) {
-          toast.error(e instanceof Error ? e.message : "Couldn't add page");
+          toast.error(e instanceof Error ? e.message : "Couldn't add section");
         }
       },
     });
@@ -1027,8 +1028,8 @@ function JournalPage() {
 
   const renamePage = async (page: JournalNotePageRow) => {
     setTextDialog({
-      title: "Rename page",
-      label: "Page name",
+      title: "Rename section",
+      label: "Section name",
       initialValue: page.title,
       confirmLabel: "Rename",
       onSubmit: async (title) => {
@@ -1048,7 +1049,7 @@ function JournalPage() {
             ),
           );
         } catch (e: unknown) {
-          toast.error(e instanceof Error ? e.message : "Couldn't rename page");
+          toast.error(e instanceof Error ? e.message : "Couldn't rename section");
         }
       },
     });
@@ -1083,22 +1084,22 @@ function JournalPage() {
       );
     } catch (e: unknown) {
       setPageTitleDraft(selectedPage.title);
-      toast.error(e instanceof Error ? e.message : "Couldn't rename page");
+      toast.error(e instanceof Error ? e.message : "Couldn't rename section");
     }
   };
 
   const removePage = async (page: JournalNotePageRow) => {
     if (!selectedNote || selectedNote.pages.length <= 1) {
-      toast.error("Keep at least one page in a note");
+      toast.error("Keep at least one section in an entry");
       return;
     }
     const noteId = selectedNote.id;
     const pageIndex = selectedNote.pages.findIndex((item) => item.id === page.id);
     const nextPage = selectedNote.pages[pageIndex + 1] ?? selectedNote.pages[pageIndex - 1];
     setConfirmDialog({
-      title: "Delete page?",
-      description: `"${page.title}" will be removed from this note.`,
-      confirmLabel: "Delete page",
+      title: "Delete section?",
+      description: `"${page.title}" will be removed from this entry.`,
+      confirmLabel: "Delete section",
       destructive: true,
       onConfirm: async () => {
         try {
@@ -1117,7 +1118,7 @@ function JournalPage() {
           }
           setPagePickerOpen(false);
         } catch (e: unknown) {
-          toast.error(e instanceof Error ? e.message : "Couldn't delete page");
+          toast.error(e instanceof Error ? e.message : "Couldn't delete section");
         }
       },
     });
@@ -1170,7 +1171,7 @@ function JournalPage() {
       setNotes((current) =>
         current.map((item) => (item.id === noteId ? { ...item, pages: previousPages } : item)),
       );
-      toast.error(e instanceof Error ? e.message : "Couldn't reorder pages");
+      toast.error(e instanceof Error ? e.message : "Couldn't reorder sections");
     }
   };
 
@@ -1215,9 +1216,9 @@ function JournalPage() {
       setSelectedNoteIds([]);
       setBulkMode(false);
       setBulkMoveOpen(false);
-      toast.success(ids.length === 1 ? "Note moved" : "Notes moved");
+      toast.success(ids.length === 1 ? "Entry moved" : "Entries moved");
     } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : "Couldn't move notes");
+      toast.error(e instanceof Error ? e.message : "Couldn't move entries");
     }
   };
 
@@ -1225,12 +1226,12 @@ function JournalPage() {
     const ids = selectedNoteIds;
     if (!ids.length) return;
     setConfirmDialog({
-      title: ids.length === 1 ? "Delete note?" : "Delete notes?",
+      title: ids.length === 1 ? "Delete entry?" : "Delete entries?",
       description:
         ids.length === 1
-          ? "This note and all of its pages will be deleted."
-          : `${ids.length} notes and all of their pages will be deleted.`,
-      confirmLabel: ids.length === 1 ? "Delete note" : "Delete notes",
+          ? "This entry and all of its sections will be deleted."
+          : `${ids.length} entries and all of their sections will be deleted.`,
+      confirmLabel: ids.length === 1 ? "Delete entry" : "Delete entries",
       destructive: true,
       onConfirm: async () => {
         try {
@@ -1241,7 +1242,7 @@ function JournalPage() {
           setBulkMoveOpen(false);
           if (selectedNoteId && ids.includes(selectedNoteId)) setSelectedNoteId(null);
         } catch (e: unknown) {
-          toast.error(e instanceof Error ? e.message : "Couldn't delete notes");
+          toast.error(e instanceof Error ? e.message : "Couldn't delete entries");
         }
       },
     });
@@ -1314,7 +1315,7 @@ function JournalPage() {
   const removeFolder = async (folder: JournalFolderRow) => {
     setConfirmDialog({
       title: "Delete folder?",
-      description: `"${folder.name}" will be deleted. Notes in it will move to Unfiled.`,
+      description: `"${folder.name}" will be deleted. Entries in it will move to Unfiled.`,
       confirmLabel: "Delete folder",
       destructive: true,
       onConfirm: async () => {
@@ -1338,9 +1339,9 @@ function JournalPage() {
     if (!selectedNote) return;
     const note = selectedNote;
     setConfirmDialog({
-      title: "Delete note?",
-      description: `"${note.title}" and all of its pages will be deleted.`,
-      confirmLabel: "Delete note",
+      title: "Delete entry?",
+      description: `"${note.title}" and all of its sections will be deleted.`,
+      confirmLabel: "Delete entry",
       destructive: true,
       onConfirm: async () => {
         try {
@@ -1351,7 +1352,7 @@ function JournalPage() {
             return next;
           });
         } catch (e: unknown) {
-          toast.error(e instanceof Error ? e.message : "Couldn't delete note");
+          toast.error(e instanceof Error ? e.message : "Couldn't delete entry");
         }
       },
     });
@@ -1685,15 +1686,12 @@ function JournalPage() {
 
   return (
     <div className="px-4 pt-8 pb-6 animate-fade-up lg:px-6">
-      <header className="mb-5">
-        <div className="flex items-center justify-end">
-          {/* <div className="text-center">
-            <p className="text-[11px] font-semibold uppercase text-muted-foreground">
-              {notes.length} note{notes.length === 1 ? "" : "s"}
-            </p>
-            <h1 className="mt-1 text-3xl text-foreground">Journal</h1>
-          </div> */}
-          <div className="flex items-center justify-end gap-2">
+      <PageHeader
+        className="mb-5"
+        eyebrow={`${notes.length} entr${notes.length === 1 ? "y" : "ies"}`}
+        title="Journal"
+        actions={
+          <>
             <button
               type="button"
               onClick={() => setSearchOpen(true)}
@@ -1704,9 +1702,9 @@ function JournalPage() {
               <Search className="h-[18px] w-[18px]" />
             </button>
             <ThemeToggle />
-          </div>
-        </div>
-      </header>
+          </>
+        }
+      />
 
       <section className="flex flex-col justify-between pb-8">
         <div>
@@ -1833,8 +1831,8 @@ function JournalPage() {
               type="button"
               onClick={() => addNote()}
               className="icon-button"
-              aria-label="New note"
-              title="New note"
+              aria-label="New entry"
+              title="New entry"
             >
               <Plus className="h-[18px] w-[18px]" />
             </button>
@@ -1861,7 +1859,7 @@ function JournalPage() {
         {mobileFolderStack && activeFolderId === "all" && (
           <div className="mb-3 flex items-center gap-2 text-[10px] font-bold uppercase text-muted-foreground">
             <span className="h-px flex-1 bg-border" />
-            <span>Unfiled notes</span>
+            <span>Unfiled entries</span>
             <span className="h-px flex-1 bg-border" />
           </div>
         )}
@@ -1919,7 +1917,7 @@ function JournalPage() {
           selectedNoteIds={selectedNoteIds}
           onSelect={selectNote}
           onToggleSelect={toggleNoteSelection}
-          emptyLabel="No notes here yet."
+          emptyLabel="No entries here yet."
         />
       </section>
 
@@ -1936,8 +1934,8 @@ function JournalPage() {
                   setSelectedNoteId(null);
                 }}
                 className="icon-button h-9 w-9 shrink-0"
-                aria-label="Close note"
-                title="Close note"
+                aria-label="Close entry"
+                title="Close entry"
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>
@@ -1953,8 +1951,8 @@ function JournalPage() {
                     setPagePickerOpen((open) => !open);
                   }}
                   className="icon-button h-9 w-9 shrink-0 md:hidden"
-                  aria-label="Pages"
-                  title="Pages"
+                  aria-label="Sections"
+                  title="Sections"
                 >
                   <List className="h-4 w-4" />
                 </button>
@@ -1966,8 +1964,8 @@ function JournalPage() {
                     setNoteSettingsOpen((open) => !open);
                   }}
                   className="icon-button h-9 w-9 shrink-0"
-                  aria-label="Note settings"
-                  title="Note settings"
+                  aria-label="Entry settings"
+                  title="Entry settings"
                 >
                   <Settings2 className="h-4 w-4" />
                 </button>
@@ -1975,8 +1973,8 @@ function JournalPage() {
                   type="button"
                   onClick={removeSelectedNote}
                   className="icon-button h-9 w-9 shrink-0 text-destructive"
-                  aria-label="Delete note"
-                  title="Delete note"
+                  aria-label="Delete entry"
+                  title="Delete entry"
                 >
                   <Trash2 className="h-4 w-4" />
                 </button>
@@ -2081,7 +2079,7 @@ function JournalPage() {
                               }
                             }}
                             className="min-w-0 max-w-full rounded-md bg-muted/70 px-2 py-1 text-xs font-semibold text-foreground outline-none ring-1 ring-ring"
-                            aria-label="Page title"
+                            aria-label="Section name"
                           />
                         ) : (
                           <button
@@ -2091,7 +2089,7 @@ function JournalPage() {
                               setEditingPageTitle(true);
                             }}
                             className="min-w-0 max-w-full truncate rounded-md px-1 py-0.5 text-left transition-colors hover:bg-muted hover:text-foreground"
-                            title="Edit page title"
+                            title="Edit section name"
                           >
                             {selectedPage.title}
                           </button>
@@ -2101,7 +2099,7 @@ function JournalPage() {
                       </div>
                     )}
                     <label htmlFor="journal-page-heading" className="sr-only">
-                      Page title
+                      Content heading
                     </label>
                     <input
                       ref={pageHeadingInputRef}
@@ -2119,7 +2117,7 @@ function JournalPage() {
                         focusEditorBody();
                       }}
                       className="w-full bg-transparent text-2xl font-bold text-foreground outline-none placeholder:text-muted-foreground"
-                      placeholder="Entry title"
+                      placeholder="Heading"
                     />
                   </div>
                 </div>
@@ -2161,7 +2159,7 @@ function JournalPage() {
                         className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 font-medium"
                       >
                         <Plus className="h-4 w-4" />
-                        Add page
+                        Add section
                       </button>
                     </div>
                   )}
@@ -2493,14 +2491,14 @@ function PageSidebar({
   return (
     <aside className="hidden w-56 shrink-0 border-r border-border py-4 pr-3 md:block">
       <div className="mb-3 flex items-center justify-between gap-2">
-        <span className="text-xs font-bold uppercase text-muted-foreground">Pages</span>
+        <span className="text-xs font-bold uppercase text-muted-foreground">Sections</span>
         <div className="flex items-center gap-1.5">
           <button
             type="button"
             onClick={onAdd}
             className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border text-muted-foreground hover:text-foreground"
-            aria-label="Add page"
-            title="Add page"
+            aria-label="Add section"
+            title="Add section"
           >
             <Plus className="h-4 w-4" />
           </button>
@@ -2513,8 +2511,8 @@ function PageSidebar({
                 ? "border-primary bg-primary text-primary-foreground"
                 : "border-border text-muted-foreground hover:text-foreground"
             }`}
-            aria-label={reorderMode ? "Done reordering pages" : "Reorder pages"}
-            title={reorderMode ? "Done reordering pages" : "Reorder pages"}
+            aria-label={reorderMode ? "Done reordering sections" : "Reorder sections"}
+            title={reorderMode ? "Done reordering sections" : "Reorder sections"}
           >
             {reorderMode ? <Check className="h-4 w-4" /> : <ArrowUpDown className="h-4 w-4" />}
           </button>
@@ -2545,8 +2543,8 @@ function PageSidebar({
                   onClick={() => onMove(page.id, -1)}
                   disabled={index === 0}
                   className="flex h-1/2 items-center justify-center rounded-t-full text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-25"
-                  aria-label={`Move ${page.title} up`}
-                  title={`Move ${page.title} up`}
+                  aria-label={`Move section ${page.title} up`}
+                  title={`Move section ${page.title} up`}
                 >
                   <ChevronUp className="h-3.5 w-3.5" />
                 </button>
@@ -2555,8 +2553,8 @@ function PageSidebar({
                   onClick={() => onMove(page.id, 1)}
                   disabled={index === pages.length - 1}
                   className="flex h-1/2 items-center justify-center rounded-b-full text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-25"
-                  aria-label={`Move ${page.title} down`}
-                  title={`Move ${page.title} down`}
+                  aria-label={`Move section ${page.title} down`}
+                  title={`Move section ${page.title} down`}
                 >
                   <ChevronDown className="h-3.5 w-3.5" />
                 </button>
@@ -2567,8 +2565,8 @@ function PageSidebar({
                   type="button"
                   onClick={() => onRename(page)}
                   className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground opacity-0 transition-opacity hover:bg-muted hover:text-foreground group-hover:opacity-100"
-                  aria-label={`Rename ${page.title}`}
-                  title={`Rename ${page.title}`}
+                  aria-label={`Rename section ${page.title}`}
+                  title={`Rename section ${page.title}`}
                 >
                   <Pencil className="h-3.5 w-3.5" />
                 </button>
@@ -2576,8 +2574,8 @@ function PageSidebar({
                   type="button"
                   onClick={() => onDelete(page)}
                   className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground opacity-0 transition-opacity hover:bg-muted hover:text-destructive group-hover:opacity-100"
-                  aria-label={`Delete ${page.title}`}
-                  title={`Delete ${page.title}`}
+                  aria-label={`Delete section ${page.title}`}
+                  title={`Delete section ${page.title}`}
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>
@@ -2626,13 +2624,13 @@ function MobilePageMenu({
   return (
     <div className="absolute top-full right-0 left-0 z-40 mt-2 rounded-lg border border-border bg-popover p-3 shadow-xl md:hidden">
       <div className="mb-2 flex items-center justify-between gap-2">
-        <span className="text-xs font-bold uppercase text-muted-foreground">Pages</span>
+        <span className="text-xs font-bold uppercase text-muted-foreground">Sections</span>
         <button
           type="button"
           onClick={onClose}
           className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
-          aria-label="Close pages"
-          title="Close pages"
+          aria-label="Close sections"
+          title="Close sections"
         >
           <X className="h-4 w-4" />
         </button>
@@ -2643,8 +2641,8 @@ function MobilePageMenu({
           onClick={onPrevious}
           disabled={!canGoPrevious}
           className="icon-button h-9 w-9 shrink-0 disabled:opacity-35"
-          aria-label="Previous page"
-          title="Previous page"
+          aria-label="Previous section"
+          title="Previous section"
         >
           <ChevronLeft className="h-4 w-4" />
         </button>
@@ -2653,8 +2651,8 @@ function MobilePageMenu({
           onClick={onNext}
           disabled={!canGoNext}
           className="icon-button h-9 w-9 shrink-0 disabled:opacity-35"
-          aria-label="Next page"
-          title="Next page"
+          aria-label="Next section"
+          title="Next section"
         >
           <ChevronRight className="h-4 w-4" />
         </button>
@@ -2662,8 +2660,8 @@ function MobilePageMenu({
           type="button"
           onClick={onAdd}
           className="icon-button h-9 w-9 shrink-0"
-          aria-label="Add page"
-          title="Add page"
+          aria-label="Add section"
+          title="Add section"
         >
           <Plus className="h-4 w-4" />
         </button>
@@ -2676,8 +2674,8 @@ function MobilePageMenu({
               ? "border-primary bg-primary text-primary-foreground"
               : "border-border text-muted-foreground"
           }`}
-          aria-label={reorderMode ? "Done reordering pages" : "Reorder pages"}
-          title={reorderMode ? "Done reordering pages" : "Reorder pages"}
+          aria-label={reorderMode ? "Done reordering sections" : "Reorder sections"}
+          title={reorderMode ? "Done reordering sections" : "Reorder sections"}
         >
           {reorderMode ? (
             <Check className="h-3.5 w-3.5" />
@@ -2692,8 +2690,8 @@ function MobilePageMenu({
               onClick={onMoveUp}
               disabled={!onMoveUp || !canGoPrevious}
               className="flex h-8 w-8 items-center justify-center rounded-full border border-border text-muted-foreground disabled:opacity-35"
-              aria-label="Move page up"
-              title="Move page up"
+              aria-label="Move section up"
+              title="Move section up"
             >
               <ChevronUp className="h-3.5 w-3.5" />
             </button>
@@ -2702,8 +2700,8 @@ function MobilePageMenu({
               onClick={onMoveDown}
               disabled={!onMoveDown || !canGoNext}
               className="flex h-8 w-8 items-center justify-center rounded-full border border-border text-muted-foreground disabled:opacity-35"
-              aria-label="Move page down"
-              title="Move page down"
+              aria-label="Move section down"
+              title="Move section down"
             >
               <ChevronDown className="h-3.5 w-3.5" />
             </button>
@@ -2715,8 +2713,8 @@ function MobilePageMenu({
               onClick={onRename}
               disabled={!onRename}
               className="flex h-8 w-8 items-center justify-center rounded-full border border-border text-muted-foreground disabled:opacity-35"
-              aria-label="Rename page"
-              title="Rename page"
+              aria-label="Rename section"
+              title="Rename section"
             >
               <Pencil className="h-3.5 w-3.5" />
             </button>
@@ -2725,8 +2723,8 @@ function MobilePageMenu({
               onClick={onDelete}
               disabled={!onDelete || pages.length <= 1}
               className="flex h-8 w-8 items-center justify-center rounded-full border border-border text-muted-foreground disabled:opacity-35"
-              aria-label="Delete page"
-              title="Delete page"
+              aria-label="Delete section"
+              title="Delete section"
             >
               <Trash2 className="h-3.5 w-3.5" />
             </button>
@@ -2793,7 +2791,7 @@ function NoteSettingsPanel({
         <div>
           <p className="text-xs font-bold uppercase text-muted-foreground">Settings</p>
           <h2 className="text-lg font-bold text-foreground">
-            {draftNoteTitle.trim() || "Untitled note"}
+            {draftNoteTitle.trim() || "Untitled entry"}
           </h2>
         </div>
         <button
@@ -2808,7 +2806,7 @@ function NoteSettingsPanel({
       </div>
 
       <label className="mb-4 block space-y-1">
-        <span className="text-[10px] font-bold uppercase text-muted-foreground">Note name</span>
+        <span className="text-[10px] font-bold uppercase text-muted-foreground">Entry name</span>
         <input
           value={draftNoteTitle}
           onChange={(event) => onNoteTitleChange(event.target.value)}
@@ -2819,7 +2817,7 @@ function NoteSettingsPanel({
 
       <div className="mb-4 grid grid-cols-2 gap-2">
         <label className="space-y-1">
-          <span className="text-[10px] font-bold uppercase text-muted-foreground">Page date</span>
+          <span className="text-[10px] font-bold uppercase text-muted-foreground">Entry date</span>
           <input
             type="date"
             value={draftEntryDate}
@@ -2828,7 +2826,7 @@ function NoteSettingsPanel({
           />
         </label>
         <label className="space-y-1">
-          <span className="text-[10px] font-bold uppercase text-muted-foreground">Page time</span>
+          <span className="text-[10px] font-bold uppercase text-muted-foreground">Entry time</span>
           <input
             type="time"
             value={draftEntryTime}
@@ -2913,7 +2911,7 @@ function MonthlyJournalCalendar({
               key={item.iso}
               type="button"
               onClick={() => onSelect(item.iso)}
-              title={`${format(item.date, "MMMM d")} - ${count} note${count === 1 ? "" : "s"}`}
+              title={`${format(item.date, "MMMM d")} - ${count} entr${count === 1 ? "y" : "ies"}`}
               className={`relative flex aspect-square min-h-12 flex-col items-center justify-center rounded-lg border text-sm font-bold transition-transform active:scale-95 ${
                 item.inMonth
                   ? "border-border text-foreground"
@@ -3001,7 +2999,7 @@ function SearchModal({
           autoFocus
           value={query}
           onChange={(event) => onQueryChange(event.target.value)}
-          placeholder="Search notes and attachments"
+          placeholder="Search entries and attachments"
           className="rounded-full pl-9"
         />
       </div>

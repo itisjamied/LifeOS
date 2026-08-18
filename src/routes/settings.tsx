@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { PageHeader } from "@/components/page-header";
 import { toast } from "sonner";
 import { fetchAllRoutine } from "@/lib/routine-data";
 import { computeStats } from "@/lib/streaks";
@@ -55,14 +56,8 @@ function SettingsPage() {
   }
 
   return (
-    <div className="px-5 pt-10 animate-fade-up">
-      <header className="mb-7 flex items-start justify-between">
-        <div>
-          <p className="text-xs font-medium uppercase text-muted-foreground">Account</p>
-          <h1 className="mt-1 text-4xl text-foreground">Settings</h1>
-        </div>
-        <ThemeToggle />
-      </header>
+    <div className="px-5 pt-8 animate-fade-up">
+      <PageHeader eyebrow="Account" title="Settings" actions={<ThemeToggle />} />
 
       <div className="surface space-y-5 p-5">
         <div className="space-y-1.5">

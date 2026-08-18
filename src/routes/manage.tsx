@@ -1,10 +1,18 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAllRoutine, type FullTask, type VariantRow } from "@/lib/routine-data";
-import { glyphFor, COLOR_TOKENS, colorValue, isHexColor, firstGrapheme } from "@/lib/symbols";
+import {
+  glyphFor,
+  COLOR_TOKENS,
+  SYMBOL_PRESETS,
+  colorValue,
+  isHexColor,
+  firstGrapheme,
+} from "@/lib/symbols";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,11 +20,11 @@ import { AppConfirmDialog, type AppConfirmDialogConfig } from "@/components/ui/a
 import {
   Plus,
   Trash2,
-  ChevronLeft,
   Sparkles,
   Sun,
   Moon,
   CircleDashed,
+  ChevronLeft,
   ChevronUp,
   ChevronDown,
   GripVertical,
@@ -169,57 +177,39 @@ function ManagePage() {
       : list.filter((ft) => ft.task.time_of_day === filter);
 
   return (
-    <div className="px-5 pt-10 animate-fade-up">
-      <header className="mb-7">
-        <div className="grid grid-cols-[auto_1fr_auto] items-start gap-3">
-          <Link
-            to="/"
-            className="icon-button mt-1"
-            aria-label="Back to Today"
-            title="Back to Today"
-          >
-            <ChevronLeft className="h-[18px] w-[18px]" />
-          </Link>
-          <div className="min-w-0 text-center">
-            <p className="text-xs font-medium uppercase text-muted-foreground">Routine</p>
-            <h1 className="mt-1 text-3xl text-foreground">Edit routine</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {reordering ? "Move tasks, then save." : "Tap a task to edit."}
-            </p>
-          </div>
-          <ThemeToggle />
-        </div>
-      </header>
+    <div className="px-5 pt-8 animate-fade-up">
+      <PageHeader eyebrow="Routine" title="Edit routine" actions={<ThemeToggle />} />
 
-      {/* Filter + reorder controls */}
       {!reordering ? (
-        <div className="mb-4 flex flex-wrap items-center gap-2">
-          {(
-            [
-              { v: "all", label: "All" },
-              { v: "am", label: "Morning" },
-              { v: "any", label: "Anytime" },
-              { v: "pm", label: "Evening" },
-              { v: "other", label: "Other" },
-            ] as const
-          ).map((f) => (
-            <button
-              key={f.v}
-              type="button"
-              onClick={() => setFilter(f.v)}
-              className={`rounded-full border px-3 py-1 text-xs font-medium transition-all ${
-                filter === f.v
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "border-border bg-card text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {f.label}
-            </button>
-          ))}
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto pb-1">
+            {(
+              [
+                { v: "all", label: "All" },
+                { v: "am", label: "Morning" },
+                { v: "any", label: "Anytime" },
+                { v: "pm", label: "Evening" },
+                { v: "other", label: "Other" },
+              ] as const
+            ).map((f) => (
+              <button
+                key={f.v}
+                type="button"
+                onClick={() => setFilter(f.v)}
+                className={`shrink-0 rounded-full border px-3 py-1 text-xs font-medium transition-all ${
+                  filter === f.v
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border bg-card text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
           <button
             type="button"
             onClick={startReorder}
-            className=" mr-auto lg:ml-auto inline-flex items-center gap-1 rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground mt-10"
+            className="inline-flex h-8 shrink-0 items-center gap-1 rounded-full border border-border bg-card px-3 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
           >
             <ArrowUpDown className="h-3.5 w-3.5" /> Reorder
           </button>
@@ -582,14 +572,22 @@ function TaskEditor({
   };
 
   return (
-    <div className="px-5 pt-6 pb-10 animate-fade-up">
-      <button
-        type="button"
-        onClick={onClose}
-        className="mb-4 inline-flex items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
-      >
-        <ChevronLeft className="h-4 w-4" /> All tasks
-      </button>
+    <div className="px-5 pt-8 pb-10 animate-fade-up">
+      <PageHeader
+        leading={
+          <button
+            type="button"
+            onClick={onClose}
+            className="icon-button"
+            aria-label="Back to tasks"
+            title="Back to tasks"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+        }
+        eyebrow="Task"
+        title={name.trim() || "Task"}
+      />
 
       {/* Identity */}
       <section className="surface mb-5 space-y-4 p-5">
@@ -915,7 +913,7 @@ function VariantEditor({
           >
             {glyphFor(variant.symbol)}
           </span>
-          <span className="text-[10px] text-muted-foreground">symbol</span>
+          <span className="text-[10px] text-muted-foreground">icon</span>
         </div>
 
         <div className="min-w-0 flex-1 space-y-2">
@@ -929,6 +927,27 @@ function VariantEditor({
             placeholder="variant label"
             className="font-semibold"
           />
+          <div className="grid grid-cols-6 gap-1.5">
+            {SYMBOL_PRESETS.map((preset) => (
+              <button
+                key={preset.key}
+                type="button"
+                onClick={() => {
+                  onUpdate({ symbol: preset.key });
+                  setCustomSym("");
+                }}
+                className={`flex h-8 items-center justify-center rounded-full border text-sm transition-transform active:scale-95 ${
+                  variant.symbol === preset.key
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border bg-card text-foreground hover:border-primary/50"
+                }`}
+                aria-label={preset.label}
+                title={preset.label}
+              >
+                {preset.glyph}
+              </button>
+            ))}
+          </div>
           <Input
             value={customSym}
             onChange={(e) => setCustomSym(e.target.value)}
@@ -943,7 +962,7 @@ function VariantEditor({
                 (e.target as HTMLInputElement).blur();
               }
             }}
-            placeholder="Emoji (optional) 🌿"
+            placeholder="Custom icon or emoji"
             className="h-8 text-sm"
             maxLength={8}
           />

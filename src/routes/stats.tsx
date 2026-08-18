@@ -4,8 +4,9 @@ import { useAuth } from "@/lib/auth-context";
 import { fetchAllRoutine, fetchProfile, type FullTask } from "@/lib/routine-data";
 import { computeStats, type TaskStats } from "@/lib/streaks";
 import { parseISO } from "date-fns";
-import { ChevronLeft, Flame, Sparkles, Trophy, ArrowUpDown } from "lucide-react";
+import { Flame, Sparkles, Trophy, ArrowUpDown } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { PageHeader } from "@/components/page-header";
 import { colorValue, glyphFor } from "@/lib/symbols";
 
 const STATS_WINDOW_DAYS = 28;
@@ -92,18 +93,7 @@ function StatsPage() {
 
   return (
     <div className="px-5 pt-8 pb-6 animate-fade-up">
-      <header className="mb-6">
-        <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3">
-          <Link to="/" className="icon-button" aria-label="Back to Today" title="Back to Today">
-            <ChevronLeft className="h-[18px] w-[18px]" />
-          </Link>
-          <div className="text-center">
-            <p className="text-[11px] font-semibold uppercase text-muted-foreground">Habits</p>
-            <h1 className="mt-1 text-3xl text-foreground">Progress</h1>
-          </div>
-          <ThemeToggle />
-        </div>
-      </header>
+      <PageHeader eyebrow="Habits" title="Progress" actions={<ThemeToggle />} />
 
       {topStreak && topStreak.currentStreak > 0 && (
         <div className="surface mb-5 flex items-center gap-3 p-4">
@@ -118,9 +108,8 @@ function StatsPage() {
         </div>
       )}
 
-      {/* Filter & sort controls */}
       <div className="mb-4 space-y-2">
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 justify-center my-10">
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
           {(["all", "am", "pm", "any", "other"] as TimeFilter[]).map((tf) => (
             <button
               key={tf}
@@ -135,7 +124,7 @@ function StatsPage() {
             </button>
           ))}
         </div>
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
           <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground" />
           <span className="text-[10px] uppercase text-muted-foreground">Sort</span>
           {(

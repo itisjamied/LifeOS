@@ -5,8 +5,9 @@ import { fetchAllRoutine, fetchProfile, type FullTask } from "@/lib/routine-data
 import { scheduleDayFor } from "@/lib/schedule";
 import { glyphFor, colorValue } from "@/lib/symbols";
 import { parseISO } from "date-fns";
-import { CalendarDays, ChevronLeft, Sparkles } from "lucide-react";
+import { CalendarDays, Sparkles } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { PageHeader } from "@/components/page-header";
 
 export const Route = createFileRoute("/grid")({
   head: () => ({
@@ -53,19 +54,8 @@ function GridPage() {
   }
 
   return (
-    <div className="px-4 pt-8 pb-6 animate-fade-up">
-      <header className="mb-6">
-        <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3">
-          <Link to="/" className="icon-button" aria-label="Back to Today" title="Back to Today">
-            <ChevronLeft className="h-[18px] w-[18px]" />
-          </Link>
-          <div className="text-center">
-            <p className="text-[11px] font-semibold uppercase text-muted-foreground">Routine</p>
-            <h1 className="mt-1 text-3xl text-foreground">Calendar</h1>
-          </div>
-          <ThemeToggle />
-        </div>
-      </header>
+    <div className="px-5 pt-8 pb-6 animate-fade-up">
+      <PageHeader eyebrow="Routine" title="Calendar" actions={<ThemeToggle />} />
 
       <div className="surface overflow-hidden p-3">
         <div className="mb-3 flex items-center justify-center gap-2 text-muted-foreground">

@@ -19,6 +19,7 @@ import {
 } from "date-fns";
 import { ChevronLeft, Flame, Sparkles, Trophy } from "lucide-react";
 import { colorValue, glyphFor } from "@/lib/symbols";
+import { PageHeader } from "@/components/page-header";
 
 const HABIT_DETAIL_WINDOW_DAYS = 28;
 
@@ -79,7 +80,7 @@ function HabitDetailPage() {
   }
 
   const measuredEntries = entries.filter(isMeasuredEntry);
-  const scheduled = measuredEntries.filter((e) => e.scheduled);
+  const scheduled = measuredEntries.filter((e) => e.scheduled && !e.skipped);
   const completed = scheduled.filter((e) => e.done);
   const consistency =
     scheduled.length === 0 ? 100 : Math.round((completed.length / scheduled.length) * 100);
@@ -88,7 +89,7 @@ function HabitDetailPage() {
   let current = 0;
   for (let i = measuredEntries.length - 1; i >= 0; i--) {
     const e = measuredEntries[i];
-    if (!e.scheduled) continue;
+    if (!e.scheduled || e.skipped) continue;
     if (e.done) current++;
     else if (i !== measuredEntries.length - 1) break;
     else continue; // today not yet done — ignore
@@ -96,19 +97,29 @@ function HabitDetailPage() {
 
   return (
     <div className="px-5 pt-8 pb-6 animate-fade-up">
-      <Link to="/" className="icon-button" aria-label="Back to Today" title="Back to Today">
-        <ChevronLeft className="h-4 w-4" />
-      </Link>
-      <header className="mt-4 mb-5 text-center">
-        <span
-          className="mx-auto flex h-14 w-14 shrink-0 items-center justify-center rounded-[1.25rem] text-2xl font-black text-white shadow-md"
-          style={{ backgroundColor: colorValue(ft.task.color) }}
-          aria-hidden
-        >
-          {glyphFor(ft.variants[0]?.symbol)}
-        </span>
-        <h1 className="mt-3 text-3xl text-foreground">{ft.task.name}</h1>
-      </header>
+      <PageHeader
+        leading={
+          <Link
+            to="/today"
+            className="icon-button"
+            aria-label="Back to Habits"
+            title="Back to Habits"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Link>
+        }
+        eyebrow="Habit"
+        title={ft.task.name}
+        icon={
+          <span
+            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[1.1rem] text-xl font-black text-white shadow-md"
+            style={{ backgroundColor: colorValue(ft.task.color) }}
+            aria-hidden
+          >
+            {glyphFor(ft.variants[0]?.symbol)}
+          </span>
+        }
+      />
 
       <div
         className="habit-pill mb-5 overflow-hidden p-5 text-white shadow-lg"
@@ -134,6 +145,9 @@ function HabitDetailPage() {
         <CalendarGrid entries={entries} taskColor={ft.task.color} />
         <div className="mt-3 flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
           <Legend color={ft.task.color} label="Done" />
+          <span className="inline-flex items-center gap-1">
+            <span className="h-3 w-3 rounded-sm border border-border bg-muted" /> Skipped
+          </span>
           <span className="inline-flex items-center gap-1">
             <span
               className="h-3 w-3 rounded-sm border opacity-35"
@@ -246,11 +260,13 @@ function CalendarGrid({ entries, taskColor }: { entries: DayEntry[]; taskColor: 
           <div key={row[0]?.iso} className="grid grid-cols-7 gap-1">
             {row.map((e) => {
               const status = e.scheduled
-                ? e.done
-                  ? "Done"
-                  : isAfter(e.date, new Date())
-                    ? "Expected"
-                    : "Missed"
+                ? e.skipped
+                  ? "Skipped"
+                  : e.done
+                    ? "Done"
+                    : isAfter(e.date, new Date())
+                      ? "Expected"
+                      : "Missed"
                 : "Off";
               const title = `${format(e.date, "MMM d")} — ${status}`;
               if (!e.scheduled) {
@@ -259,6 +275,15 @@ function CalendarGrid({ entries, taskColor }: { entries: DayEntry[]; taskColor: 
                     key={e.iso}
                     title={title}
                     className="aspect-square rounded-sm border border-border bg-transparent"
+                  />
+                );
+              }
+              if (e.skipped) {
+                return (
+                  <span
+                    key={e.iso}
+                    title={title}
+                    className="aspect-square rounded-sm border border-border bg-muted"
                   />
                 );
               }

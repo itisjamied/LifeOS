@@ -11,6 +11,7 @@ import {
   type WeeklyGoalsData,
 } from "@/lib/goals-data";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { PageHeader } from "@/components/page-header";
 import {
   CalendarDays,
   Check,
@@ -192,19 +193,13 @@ function GoalsPage() {
 
   return (
     <div className="px-5 pt-8 animate-fade-up">
-      <header className="mb-6">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <p className="text-[11px] font-semibold uppercase text-muted-foreground">
-              {format(weekStartDate, "MMM d")} - {format(weekEndDate, "MMM d")}
-            </p>
-            <h1 className="mt-1 text-3xl text-foreground">Goals</h1>
-          </div>
-          <ThemeToggle />
-        </div>
-      </header>
+      <PageHeader
+        eyebrow={`${format(weekStartDate, "MMM d")} - ${format(weekEndDate, "MMM d")}`}
+        title="Goals"
+        actions={<ThemeToggle />}
+      />
 
-      <div className="mb-5 flex items-center justify-center gap-3">
+      <div className="mb-5 flex items-center justify-start gap-2">
         <button
           type="button"
           onClick={() => setWeekStartDate((date) => subWeeks(date, 1))}
@@ -218,10 +213,10 @@ function GoalsPage() {
           type="button"
           onClick={() => setWeekStartDate(startOfWeek(new Date(), { weekStartsOn: 1 }))}
           disabled={isCurrentWeek}
-          className={`inline-flex min-w-36 items-center justify-center gap-2 rounded-full border px-4 py-2 text-sm font-bold transition-colors ${
+          className={`inline-flex h-10 min-w-32 items-center justify-center gap-2 rounded-full border px-4 text-sm font-bold transition-colors ${
             isCurrentWeek
-              ? "border-primary bg-primary text-primary-foreground"
-              : "border-border bg-card text-foreground"
+              ? "border-primary/25 bg-primary/10 text-primary"
+              : "border-border bg-card/80 text-foreground"
           }`}
         >
           <CalendarDays className="h-4 w-4" />

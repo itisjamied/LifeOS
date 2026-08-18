@@ -15,6 +15,7 @@ export type Database = {
           date: string;
           done: boolean;
           id: string;
+          skipped: boolean;
           task_id: string;
           user_id: string;
         };
@@ -24,6 +25,7 @@ export type Database = {
           date: string;
           done?: boolean;
           id?: string;
+          skipped?: boolean;
           task_id: string;
           user_id: string;
         };
@@ -33,6 +35,7 @@ export type Database = {
           date?: string;
           done?: boolean;
           id?: string;
+          skipped?: boolean;
           task_id?: string;
           user_id?: string;
         };
